@@ -13,8 +13,8 @@ public class EnemyCollision : MonoBehaviour
     // Update is called once per frame
     public void PushBody(Rigidbody r)
     {
+       
+        r.transform.position += new Vector3((r.position - transform.position).x, 0, (r.position - transform.position).z).normalized*.2f;
 
-        r.transform.position += (r.position - transform.position).normalized*.2f;
-        
     }
 }

@@ -20,8 +20,8 @@ public class client : MonoBehaviour
     public GameObject EnemyPrefab;
     public ConnectionPacket lastConnectionPacket;//all statics except for instance are to be set outside the script
     public static client instance;
-    public static IPEndPoint server;
-    public static string username;
+    public static IPEndPoint server;//needs to be set outside of this script before scene load
+    public static string username;//needs to be set outside of this script before scene load
     Thread recieveThread;
     public Socket socket;
     public List<Player> Players = new List<Player>();
@@ -48,7 +48,7 @@ public class client : MonoBehaviour
     void Recieve() 
     {
         byte[] b = new byte[1024];
-        EndPoint player = new IPEndPoint(IPAddress.Any, 0);
+        EndPoint player = server;
         socket.ReceiveFrom(b, ref player);
         PacketHandler.instance.OffloadClient(b, (IPEndPoint)player);
         if (playing)

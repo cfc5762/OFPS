@@ -14,11 +14,11 @@ public class Server : MonoBehaviour
 {
     static bool recieving = false;
     public Socket socket;
-    public GameObject EnemyPrefab;
+    public GameObject EnemyPrefab;//set in scene
     public List<Player> Players = new List<Player>();
     public LinkedList<IPEndPoint> EndPoints = new LinkedList<IPEndPoint>();
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
-    //public LinkedList<HitPacket> Unresolved = new LinkedList<HitPacket>(); unused
+    
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
     public LinkedList<HitAck> Confirmed = new LinkedList<HitAck>();
     public Thread recv;

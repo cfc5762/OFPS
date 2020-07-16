@@ -27,17 +27,18 @@ public class PacketHandler : MonoBehaviour
     public void OffloadClient(byte[] P, IPEndPoint e) 
     {
         if (e == client.server) 
-        {
+        {//if we got it from the server offload 
             client.instance.Queue.AddFirst(P);
         }
     }
     public void Offload(byte[] P,IPEndPoint e)
-    {
+    {//offload with endpoints to the queue to be processed
         Server.instance.EndPoints.AddFirst((IPEndPoint)e);
         Server.instance.Queue.AddFirst(P);
     }
     public void clientHandlePacket(Packet p)
     {
+        //if its a connection packet log the interaction
         if (p is ConnectionPacket) 
         {
             ConnectionPacket P = (ConnectionPacket)p;
@@ -47,6 +48,7 @@ public class PacketHandler : MonoBehaviour
                 client.instance.Players[i].userName = P.usernames[i];
             }
         }
+        //if its a hit acknowledgement we send it back after removing the correct node from unconfirmed
         if (p is HitAck) 
         {
             HitAck P = (HitAck)p;
@@ -59,18 +61,19 @@ public class PacketHandler : MonoBehaviour
 
                     unconfirmed = unconfirmed.Next;
                     client.instance.unConfirmed.Remove(unconfirmed.Previous);
-                    client.instance.socket.SendTo(P.toBytes(), client.server);
+                    //hitmarker happens here
                     break;
                 }
                 else {
                     unconfirmed = unconfirmed.Next; }
             }
-            
+            client.instance.socket.SendTo(P.toBytes(), client.server);
+
         }
     }
     public void clientHandlePacket(ServerFragment s) 
     {
-        while (s.playernum >= client.instance.Players.Count) 
+        while (s.playernum >= client.instance.Players.Count) //their playernum is higher than our max players
         {
             Player player = new Player();
             player.EndPoint = client.server;
@@ -79,10 +82,10 @@ public class PacketHandler : MonoBehaviour
             player.Dummy.transform.position = new Vector3(0, 1000, 0);
         }
         MovementPacket m = new MovementPacket(s.position,s.Rotation,s.playernum);//movement packet of the enemy
-        m.timeCreated = s.timeCreated;
-        client.instance.Players[s.playernum].PacketHistory.AddFirst(m);
+        m.timeCreated = s.timeCreated;//make sure they are identical
+        client.instance.Players[s.playernum].PacketHistory.AddFirst(m);//add it to the players packethistory
         client.instance.Players[s.playernum].Delay = s.delay;
-        Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();
+        Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();//adjust the Enemy component
         enemy.username = client.instance.Players[s.playernum].userName;
         enemy.health = 100 - s.damageTaken; 
         
