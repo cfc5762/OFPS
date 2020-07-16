@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Net;
 using UnityEngine;
-
+using System;
+[Serializable]
 public class MovementPacket : Packet
 {
     public MovementPacket(Transform t) : base() 

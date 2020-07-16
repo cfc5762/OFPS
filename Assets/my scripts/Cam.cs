@@ -8,11 +8,14 @@ public class Cam : MonoBehaviour
 
     private void Awake()
     {
-        client.cam = transform;
+       
     }
     // Update is called once per frame
     void Update()
     {
-        
+        if (!client.cam) 
+        {
+            client.cam = transform;
+        }
     }
 }

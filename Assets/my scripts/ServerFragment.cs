@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
-
+[Serializable]
 public class ServerFragment
 {
     public DateTime timeCreated;

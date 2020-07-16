@@ -24,7 +24,7 @@ public class Server : MonoBehaviour
     public Thread recv;
     public static Server instance;
     // Start is called before the first frame update
-    void Awake()
+    void Awake()//set the server singleton
     {
         if (instance != null && instance != this)
         {
@@ -34,8 +34,8 @@ public class Server : MonoBehaviour
         {
             instance = this;
             DontDestroyOnLoad(gameObject);
-            socket = new Socket(SocketType.Dgram, ProtocolType.Udp);
-            socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0,0,0,0}), 28960));
+            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0,0,0,0}), 28960));//listen on any address on this port
 
             recieving = true;
             recv = new Thread(()=> { Recieve(socket); });
@@ -48,17 +48,22 @@ public class Server : MonoBehaviour
     {
         recieving = false;
     }
-    public bool[] TestHit(HitPacket H)//returns an array of which enemies we hit witha given hitpacket
+    private void OnApplicationQuit()
+    {
+        recieving = false;
+    }
+    public bool[] TestHit(HitPacket H)//returns an array of which enemies we hit with a given hitpacket
     {
         bool[] Confirms = new bool[H.hits.Length];
         List<GameObject> Enemies = new List<GameObject>();
         for (int i = 0; i < H.hits.Length; i++)
         {
 
-            if (Players[H.hits[i]].PacketHistory.First.Value.timeCreated <= H.timeCreated)
+            if (Players[H.hits[i]].PacketHistory.First.Value.timeCreated <= H.timeCreated)//if the most recent node is before our shot we predict and extrapolate
             {
                 if (Players[H.hits[i]].PacketHistory.Count > 2)
                 {
+                    // this graph explains this block https://gyazo.com/f242ed66b95169f5cf85347ccee5f671
                     Player player = Players[H.hits[i]];
                     Vector3 n_nocross = (((MovementPacket)player.PacketHistory.First.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Value).position);
                     Vector3 n = Vector3.Cross(n_nocross, Vector3.up);
@@ -85,7 +90,7 @@ public class Server : MonoBehaviour
                     Confirms[i] = true;
                 }
             }
-            else 
+            else //otherwise we interpolate between the two points based on current time
             {
                 LinkedListNode<Packet> beforeShot = Players[H.hits[i]].PacketHistory.First;
                 while (beforeShot.Value.timeCreated>H.timeCreated&&beforeShot.Next.Next!=null)
@@ -95,6 +100,7 @@ public class Server : MonoBehaviour
                 }
                 if (Players[H.hits[i]].PacketHistory.Count > 2)
                 {
+                    // same graph except this time we do not need to predict https://gyazo.com/f242ed66b95169f5cf85347ccee5f671
                     Player player = Players[H.hits[i]];
                     Vector3 n_nocross = (((MovementPacket)beforeShot.Value).position - ((MovementPacket)beforeShot.Next.Value).position);
                     Vector3 n = Vector3.Cross(n_nocross, Vector3.up);
@@ -124,13 +130,13 @@ public class Server : MonoBehaviour
         }
         return Confirms;
     }
-    static void Recieve(Socket Forwarded) 
+    static void Recieve(Socket Forwarded) //constantly listen
     {
         byte[] b = new byte[1024];
-        EndPoint player = new IPEndPoint(IPAddress.Any,0);
-        Forwarded.ReceiveFrom(b,ref player);
-        PacketHandler.instance.Offload(b,(IPEndPoint)player);
-        if (recieving)
+        EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+        Forwarded.ReceiveFrom(b,ref sender);
+        PacketHandler.instance.Offload(b,(IPEndPoint)sender);
+        if (recieving)//continue the thread if we aer still recieving
             Recieve(Forwarded);
        
     }

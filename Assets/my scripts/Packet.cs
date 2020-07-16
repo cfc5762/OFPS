@@ -3,11 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Runtime.CompilerServices;
-using System.Runtime.Serialization.Formatters.Binary;
 using UnityEditor.Sprites;
 using UnityEngine;
-
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Formatters.Binary;
+[Serializable]
 public class Packet
 {
     public virtual string id { get { return timeCreated.ToString() +"-"+playernum.ToString(); } }
@@ -37,11 +37,33 @@ public class Packet
     }
     public static bool operator ==(Packet x, Packet y)
     {
-        return (x.id == y.id);
+        if (y is Packet)
+        {
+            return (x.id == y.id);
+        }
+        else 
+        {
+            if (y is null && x is null) 
+            {
+                return true;
+            }
+            return false;
+        }
     }
     public static bool operator !=(Packet x, Packet y)
     {
-        return x.id != y.id;
+        if (y is Packet)
+        {
+            return (x.id != y.id);
+        }
+        else
+        {
+            if (y is null && x is null)
+            {
+                return true;
+            }
+            return false;
+        }
     }
     public virtual byte[] toBytes()
     {
