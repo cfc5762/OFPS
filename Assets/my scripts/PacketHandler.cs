@@ -21,7 +21,7 @@ public class PacketHandler : MonoBehaviour
         else
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
+            //DontDestroyOnLoad(gameObject);
         }
     }
     public void OffloadClient(byte[] P, IPEndPoint e) 

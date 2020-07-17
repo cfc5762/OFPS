@@ -65,7 +65,7 @@ public class client : MonoBehaviour
             
             
             
-            DontDestroyOnLoad(gameObject);
+            //DontDestroyOnLoad(gameObject);
         }
     }
     void SendTo(Socket sock, byte[] b, EndPoint ep) 

@@ -277,6 +277,18 @@ MonoBehaviour:
     playernum: 0
     usernames: []
     username: 
+--- !u!114 &399480700
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 399480696}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d79abf057140c244ac412e70e65809d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &850030192
 GameObject:
   m_ObjectHideFlags: 0
@@ -287,6 +299,7 @@ GameObject:
   m_Component:
   - component: {fileID: 850030194}
   - component: {fileID: 850030193}
+  - component: {fileID: 850030195}
   m_Layer: 0
   m_Name: PacketHandler
   m_TagString: Untagged
@@ -320,6 +333,18 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &850030195
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 850030192}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d79abf057140c244ac412e70e65809d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &970253102 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 100002, guid: 5e9e851c0e142814dac026a256ba2ac0,

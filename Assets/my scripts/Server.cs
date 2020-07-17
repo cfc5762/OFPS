@@ -32,7 +32,7 @@ public class Server : MonoBehaviour
         else
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
+           //DontDestroyOnLoad(gameObject);
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0,0,0,0}), 28960));//listen on any address on this port
 
