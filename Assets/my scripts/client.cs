@@ -43,17 +43,17 @@ public class client : MonoBehaviour
     void Awake()
     {
         
-        username = "silktail";
-        server = new IPEndPoint(GetLocalIPAddress(), 28960);
-        localEp = new IPEndPoint(GetLocalIPAddress(), 28960);
+        username = "silktail";//temp initialization
+        server = new IPEndPoint(GetLocalIPAddress(), 28960);//temp initialization
+        localEp = new IPEndPoint(GetLocalIPAddress(), 0);//temp initialization
         if (instance != null && instance != this)
         {
-            gameObject.SetActive(false);
+            gameObject.SetActive(false);//ensure only one instance
         }
         else
         {   
             unConfirmed = new LinkedList<HitPacket>();
-            socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);
+            socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);//declare it like this and only like this lest ye be cursed with ipv6
             socket.Bind(localEp);
             playing = true;
 
@@ -62,9 +62,9 @@ public class client : MonoBehaviour
 
 
             instance = this;
-            //Recieve();
-             recieveThread = new Thread(() => { Recieve(); });
-             recieveThread.Start();
+            
+            recieveThread = new Thread(() => { Recieve(); });
+            recieveThread.Start();
             DontDestroyOnLoad(gameObject);
         }
     }
