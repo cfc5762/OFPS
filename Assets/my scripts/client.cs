@@ -43,9 +43,8 @@ public class client : MonoBehaviour
     void Awake()
     {
         
-        username = "silktail";//temp initialization
-        server = new IPEndPoint(GetLocalIPAddress(), 28960);//temp initialization
-        localEp = new IPEndPoint(GetLocalIPAddress(), 0);//temp initialization
+        
+        localEp = new IPEndPoint(new IPAddress(new byte[] { 127,0,0,1}), 0);//temp initialization
         if (instance != null && instance != this)
         {
             gameObject.SetActive(false);//ensure only one instance
@@ -54,21 +53,25 @@ public class client : MonoBehaviour
         {   
             unConfirmed = new LinkedList<HitPacket>();
             socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);//declare it like this and only like this lest ye be cursed with ipv6
-            socket.Bind(localEp);
+            
             playing = true;
-
+            instance = this;
+            socket.Bind(localEp);
             StartCoroutine(ConnectionTick());
             StartCoroutine(MovementTick());
-
-
-            instance = this;
-            
             recieveThread = new Thread(() => { Recieve(); });
             recieveThread.Start();
+
+            
+            
+            
             DontDestroyOnLoad(gameObject);
         }
     }
-    
+    void SendTo(Socket sock, byte[] b, EndPoint ep) 
+    {
+        Thread d = new Thread(() => { sock.SendTo(b, ep); });    
+    }
     private void OnDestroy()
     {
         playing = false;
@@ -83,12 +86,13 @@ public class client : MonoBehaviour
         {
             if (lastConnectionPacket != null)
             {
-                socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server);
+                SendTo(socket, (new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server);
             }
             else 
             {
                 EndPoint e = new IPEndPoint(GetLocalIPAddress(), 28960);
-                socket.SendTo((new ConnectionPacket(username)).toBytes(), e);
+                SendTo(socket, (new ConnectionPacket(username)).toBytes(), server);
+                
             }
             yield return new WaitForSeconds(3);
         }    
@@ -101,23 +105,33 @@ public class client : MonoBehaviour
             LinkedListNode<HitPacket> shot = unConfirmed.Last;
             for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
             {
-                socket.SendTo(shot.Value.toBytes(), server);
+                SendTo(socket, shot.Value.toBytes(), server);
+                
                 if (shot.Previous == null)
                     break;
                 shot = shot.Previous;
             }
-            socket.SendTo(movement.toBytes(), server);//send movement packet
+            SendTo(socket, movement.toBytes(), server);//send movement packet
             yield return new WaitForSeconds(1f / 120f);
         }
     }
     void Recieve()
     {
+        int failcount = 0;
         while (playing)
         {
-            byte[] b = new byte[1024];
-            EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
-            socket.ReceiveFrom(b, ref wanderingGamer);
-            PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
+           
+                byte[] b = new byte[1024];
+            IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+            EndPoint senderRemote = (EndPoint)sender;
+
+            socket.ReceiveFrom(b, ref senderRemote);
+
+                PacketHandler.instance.OffloadClient(b, (IPEndPoint)senderRemote);
+                failcount = 0;
+                
+            
+           
         }
         
     }
