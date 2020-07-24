@@ -8,30 +8,38 @@ public class MovementPacket : Packet
 {
     public MovementPacket(Transform t) : base() 
     {
-        position = t.position;
-        lookrotation = t.rotation;
+        _position = new Tuple<float, float, float>(t.position.x, t.position.y, t.position.z);
+        _lookrotation = new Tuple<float, float, float, float>(t.rotation.x, t.rotation.y, t.rotation.z,t.rotation.w);
         command = "";
     }
     public MovementPacket(Transform t,int num, IPEndPoint ep) : base(num,ep)
     {
-        position = t.position;
-        lookrotation = t.rotation;
+        _position = new Tuple<float, float, float>(t.position.x, t.position.y, t.position.z);
+        _lookrotation = new Tuple<float, float, float, float>(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
         command = "";
     }
     public MovementPacket(Transform t, int num) : base(num)
     {
-        position = t.position;
-        lookrotation = t.rotation;
+        _position = new Tuple<float, float, float>(t.position.x, t.position.y, t.position.z);
+        _lookrotation = new Tuple<float, float, float, float>(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
         command = "";
     }
     public MovementPacket(Vector3 p,Quaternion r, int num) : base(num)
     {
-        position = p;
-        lookrotation = r;
+        _position = new Tuple<float, float, float>(p.x, p.y, p.z);
+        _lookrotation = new Tuple<float, float, float, float>(r.x, r.y, r.z, r.w);
         command = "";
     }
     public override string id { get { return base.id + "-m"; } }
-    public Vector3 position;
-    public Quaternion lookrotation;
+    public Tuple<float,float,float>_position;
+    public Vector3 position 
+    {
+        get{ return new Vector3(_position.Item1, _position.Item2, _position.Item3); } 
+    }
+    public Tuple<float, float, float, float> _lookrotation;
+    public Quaternion lookrotation
+    {
+        get { return new Quaternion(_lookrotation.Item1, _lookrotation.Item2, _lookrotation.Item3, _lookrotation.Item4); }
+    }
     public string command;
 }
