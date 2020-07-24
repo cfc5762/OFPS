@@ -7,18 +7,18 @@ using System.Net.Sockets;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
-using UnityEditorInternal;
 using UnityEngine;
 //use push front for player packets to order for positional netcode
 public class Server : MonoBehaviour
 {
+    
     static bool recieving = false;
     public Socket socket;
     public GameObject EnemyPrefab;//set in scene
     public List<Player> Players = new List<Player>();
     public LinkedList<IPEndPoint> EndPoints = new LinkedList<IPEndPoint>();
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
-    
+    BinaryFormatter b = new BinaryFormatter();
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
     public LinkedList<HitAck> Confirmed = new LinkedList<HitAck>();
     public Thread recv;
@@ -32,15 +32,18 @@ public class Server : MonoBehaviour
         }
         else
         {
+            if (client.toSendQueue == null) //make sure we have a send queue
+            {
+                client.toSendQueue = new LinkedList<Tuple<Socket, byte[], EndPoint>>();
+            }
             instance = this;
-            DontDestroyOnLoad(gameObject);
+           //DontDestroyOnLoad(gameObject);
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0,0,0,0}), 28960));//listen on any address on this port
+            socket.Bind(new IPEndPoint(IPAddress.Any, 28960));//listen on any address on this port
 
             recieving = true;
             recv = new Thread(()=> { Recieve(socket); });
             recv.Start();
-            
         }
         
     }
@@ -132,24 +135,60 @@ public class Server : MonoBehaviour
     }
     static void Recieve(Socket Forwarded) //constantly listen
     {
-        byte[] b = new byte[1024];
-        EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-        Forwarded.ReceiveFrom(b,ref sender);
-        PacketHandler.instance.Offload(b,(IPEndPoint)sender);
-        if (recieving)//continue the thread if we aer still recieving
-            Recieve(Forwarded);
-       
+        while (recieving)
+        {
+            byte[] b = new byte[2048];
+            EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+            Forwarded.ReceiveFrom(b, ref sender);
+            PacketHandler.instance.Offload(b, (IPEndPoint)sender);
+        }  
+    }
+    IEnumerator distributeFragments() 
+    {
+        for (int x = 0; x < Players.Count; x++)
+        {
+            if (Players[x].PacketHistory.First != null)
+            {
+                //make a fraghment for each player
+                ServerFragment player = new ServerFragment();
+                player.playernum = x;
+                player.damageTaken = Players[x].damageTaken;
+                Packet lastMVPK = Players[x].PacketHistory.First.Value;
+                player.delay = (int)Players[x].Delay;
+                player.timeCreated = lastMVPK.timeCreated;
+                player.position = ((MovementPacket)lastMVPK).position;
+                player.Rotation = ((MovementPacket)lastMVPK).lookrotation;
+               
+                for (int y = 0; y < Players.Count; y++)
+                {//send to each player
+                 //Console.WriteLine()
+                    if (x == y)
+                    {
+                        client.toSendQueue.AddFirst(client.getNode(socket, player.toBytes(), Players[y].EndPoint));
+                    }
+                    // instance.socket.SendTo(player.toBytes(), Players[y].EndPoint);
+                }
+            }
+            yield return new WaitForSecondsRealtime(.01f);
+            
+        }
+    }
+    void SendTo(Socket sock, byte[] b, EndPoint ep)
+    {
+        Thread d = new Thread(() => { sock.SendTo(b, ep); });
     }
     private void FixedUpdate()
     {
+        
         //every frame we start by clearing the buffer of all of its packets
         LinkedListNode<byte[]> buff = instance.Queue.Last;
         LinkedListNode<IPEndPoint> ep = instance.EndPoints.Last;
         for (int i = 0; i < instance.Queue.Count; i++)
         {
-            try
-            {
-                BinaryFormatter b = new BinaryFormatter();
+            
+           
+           
+               
                 MemoryStream m = new MemoryStream(buff.Value);
                 var pack_ = b.Deserialize(m);
                 
@@ -158,39 +197,28 @@ public class Server : MonoBehaviour
                 {
                     PacketHandler.instance.ServerHandlePacket((Packet)pack_, ep);
                 }
-                //integrate the buffer and endpoint down the queue
-                buff = buff.Previous;
-                ep = ep.Previous;
-                instance.Queue.RemoveLast();
-                instance.EndPoints.RemoveLast();
-            }
-            catch (Exception e)
+            //integrate the buffer and endpoint down the queue
+            if (buff.Previous == null || ep.Previous == null)
             {
-
+                break;
             }
+            buff = buff.Previous;
+            ep = ep.Previous;
+            instance.Queue.RemoveLast();
+            instance.EndPoints.RemoveLast();
+            
+            
+            
             
         }
-        for (int x = 0; x < Players.Count; x++)
-        {//make a fraghment for each player
-            ServerFragment player = new ServerFragment();
-            player.playernum = x;
-            player.damageTaken = Players[x].damageTaken;
-            LinkedListNode<Packet> lastMVPK = Players[x].PacketHistory.First;
-            player.delay = (int)Players[x].Delay;
-            player.timeCreated = lastMVPK.Value.timeCreated;
-            player.position = ((MovementPacket)lastMVPK.Value).position;
-            player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
-            for (int y = 0; y < Players.Count; y++)
-            {//send to each player
-                socket.SendTo(player.toBytes(), Players[y].EndPoint);
-            }
-        }
+        //print(instance.Queue.Count);
+        StartCoroutine(distributeFragments());
        
         
         LinkedListNode<HitAck> current = Resolved.Last;
         for (int i = 0; i < Resolved.Count; i++)
         {
-            instance.socket.SendTo(current.Value.toBytes(), current.Value.FromUser);
+            instance.socket.SendTo(current.Value.toBytes(), instance.Players[current.Value.playernum].EndPoint);
             LinkedListNode<HitAck> placeBefore = Confirmed.First;
             for (int j = 0; j < Confirmed.Count; j++)
             {
@@ -203,7 +231,7 @@ public class Server : MonoBehaviour
                 {//we have a copy
                     break;
                 }
-                else if (placeBefore.Next == null)
+                else if (placeBefore.Next == null)//its from the super past?
                 {
                     Confirmed.AddAfter(placeBefore, current.Value);
                     break;
@@ -216,6 +244,11 @@ public class Server : MonoBehaviour
             
             current = current.Previous;
         }
+        if (Confirmed.Count >= 100) 
+        {
+            Confirmed.RemoveLast();
+        }
+        
         
     }
     private void Start()

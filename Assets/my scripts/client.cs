@@ -3,11 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
 
 public class client : MonoBehaviour
 {
+    public static Thread sendThread;
+    public static LinkedList<Tuple<Socket,byte[], EndPoint>> toSendQueue;
     public static int myPlayerNum;
     public LinkedList<HitPacket> unConfirmed;
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
@@ -42,10 +45,10 @@ public class client : MonoBehaviour
     // Start is called before the first frame update
     void Awake()
     {
-        
-        username = "silktail";//temp initialization
-        server = new IPEndPoint(GetLocalIPAddress(), 28960);//temp initialization
-        localEp = new IPEndPoint(GetLocalIPAddress(), 0);//temp initialization
+
+        client.username = "silktail";
+        client.server = new IPEndPoint(new IPAddress(new byte[] { 127, 0, 0, 1 }), 28960);//temp initialization
+        localEp = new IPEndPoint(new IPAddress(new byte[] { 127,0,0,1}), 0);//temp initialization
         if (instance != null && instance != this)
         {
             gameObject.SetActive(false);//ensure only one instance
@@ -54,21 +57,57 @@ public class client : MonoBehaviour
         {   
             unConfirmed = new LinkedList<HitPacket>();
             socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);//declare it like this and only like this lest ye be cursed with ipv6
-            socket.Bind(localEp);
+            toSendQueue = new LinkedList<Tuple<Socket, byte[], EndPoint>>();
             playing = true;
-
-            StartCoroutine(ConnectionTick());
-            StartCoroutine(MovementTick());
-
-
             instance = this;
-            
+            socket.Bind(localEp);
+            StartCoroutine(ConnectionTick());
+            StartCoroutine(MovementTick()); 
             recieveThread = new Thread(() => { Recieve(); });
             recieveThread.Start();
-            DontDestroyOnLoad(gameObject);
+            sendThread = new Thread(() => { Send(); });
+            sendThread.Start();
+
+
+
         }
     }
-    
+    void Send() 
+    {
+        while (playing)
+        {
+            int i = 0;
+            while (toSendQueue.Last != null)
+            {
+                i++;
+                if (i > 100)
+                {
+                    break;
+                }
+                toSendQueue.Last.Value.Item1.SendTo(toSendQueue.Last.Value.Item2, toSendQueue.Last.Value.Item3);
+                try
+                {
+                    toSendQueue.RemoveLast();
+                }
+                catch (Exception ex)
+                {
+
+                    
+                }
+                
+
+            }
+
+            Thread.Sleep(17);//note dont move this shit or it will crash -love brain
+        }
+        
+    }
+    void SendTo(Socket sock, byte[] b, EndPoint ep) 
+    {
+        Thread d = new Thread(() => {
+            sock.SendTo(b, ep); 
+        });    
+    }
     private void OnDestroy()
     {
         playing = false;
@@ -77,47 +116,63 @@ public class client : MonoBehaviour
     {
         playing = false;
     }
+    public static LinkedListNode<Tuple<Socket, byte[], EndPoint>> getNode(Socket so, byte[] by, EndPoint ep) 
+    {
+        return new LinkedListNode<Tuple<Socket, byte[], EndPoint>>(new Tuple<Socket, byte[], EndPoint>(so, by, ep));
+    }
     IEnumerator ConnectionTick() 
     {
         while (playing) 
         {
             if (lastConnectionPacket != null)
             {
-                socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server);
+                //SendTo(socket, (new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server);
+                
+                toSendQueue.AddFirst(getNode(socket, (new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(),server));
             }
             else 
             {
                 EndPoint e = new IPEndPoint(GetLocalIPAddress(), 28960);
-                socket.SendTo((new ConnectionPacket(username)).toBytes(), e);
+                //SendTo(socket, (new ConnectionPacket(username)).toBytes(), server);
+               
+                toSendQueue.AddFirst(getNode(socket, (new ConnectionPacket(username)).toBytes(), server));
             }
             yield return new WaitForSeconds(3);
         }    
     }
     IEnumerator MovementTick()
     {
-        while (playing && lastConnectionPacket != null) 
+        while (playing) 
         {
-            MovementPacket movement = new MovementPacket(FpsController.transform, lastConnectionPacket.playernum);//construct a movement packet out of our player
-            LinkedListNode<HitPacket> shot = unConfirmed.Last;
-            for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
-            {
-                socket.SendTo(shot.Value.toBytes(), server);
-                if (shot.Previous == null)
-                    break;
-                shot = shot.Previous;
+            if (lastConnectionPacket!=null) {
+                MovementPacket movement = new MovementPacket(FpsController.transform, lastConnectionPacket.playernum);//construct a movement packet out of our player
+                LinkedListNode<HitPacket> shot = unConfirmed.Last;
+                for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+                {
+                    toSendQueue.AddFirst(getNode(socket, shot.Value.toBytes(), server));
+                   
+                    if (shot.Previous == null)
+                        break;
+                    shot = shot.Previous;
+                }
+                toSendQueue.AddFirst(getNode(socket, movement.toBytes(), server));//send movement packet
+                //socket.SendTo(movement.toBytes(), server);
             }
-            socket.SendTo(movement.toBytes(), server);//send movement packet
-            yield return new WaitForSeconds(1f / 120f);
+            yield return new WaitForSeconds(1/120f);
         }
     }
     void Recieve()
     {
+
         while (playing)
         {
-            byte[] b = new byte[1024];
-            EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
-            socket.ReceiveFrom(b, ref wanderingGamer);
-            PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
+            byte[] b = new byte[2048];
+            IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+            EndPoint senderRemote = (EndPoint)sender;
+
+            socket.ReceiveFrom(b, ref senderRemote);
+            print("got");
+            PacketHandler.instance.OffloadClient(b, (IPEndPoint)senderRemote);
         }
         
     }

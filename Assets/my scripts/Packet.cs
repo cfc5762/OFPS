@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using UnityEditor.Sprites;
 using UnityEngine;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -12,27 +11,26 @@ public class Packet
 {
     public virtual string id { get { return timeCreated.ToString() +"-"+playernum.ToString(); } }
     public DateTime timeCreated;
-    public IPEndPoint FromUser;
     public int playernum;
     public Packet() 
     {
         timeCreated = DateTime.Now;
         playernum = 1000;
-        FromUser = new IPEndPoint(IPAddress.Any, 0);
+        
 
     }
     public Packet(int num,IPEndPoint ep)
     {
         timeCreated = DateTime.Now;
         playernum = num;
-        FromUser = ep;
+        
 
     }
     public Packet(int num)
     {
         timeCreated = DateTime.Now;
         playernum = num;
-        FromUser = new IPEndPoint(IPAddress.Any, 0);
+        
 
     }
     public static bool operator ==(Packet x, Packet y)
@@ -60,9 +58,9 @@ public class Packet
         {
             if (y is null && x is null)
             {
-                return true;
+                return false;
             }
-            return false;
+            return true;
         }
     }
     public virtual byte[] toBytes()

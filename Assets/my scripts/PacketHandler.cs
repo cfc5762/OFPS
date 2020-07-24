@@ -21,7 +21,7 @@ public class PacketHandler : MonoBehaviour
         else
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
+            //DontDestroyOnLoad(gameObject);
         }
     }
     public void OffloadClient(byte[] P, IPEndPoint e) 
@@ -67,8 +67,8 @@ public class PacketHandler : MonoBehaviour
                 else {
                     unconfirmed = unconfirmed.Next; }
             }
-            client.instance.socket.SendTo(P.toBytes(), client.server);
-
+            //client.instance.socket.SendTo(P.toBytes(), client.server);
+            client.toSendQueue.AddFirst(client.getNode(client.instance.socket, P.toBytes(), client.server));
         }
     }
     public void clientHandlePacket(ServerFragment s) 
@@ -93,90 +93,96 @@ public class PacketHandler : MonoBehaviour
     }
     public void ServerHandlePacket(Packet p,LinkedListNode<IPEndPoint> ep) 
     {
-        p.FromUser = ep.Value;
-        if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p)&&p is MovementPacket)//contains positional data
-        {
-            LinkedListNode<Packet> current = Server.instance.Players[p.playernum].PacketHistory.First;
-            while (p.timeCreated<=current.Value.timeCreated)
+        if (p is ConnectionPacket)
+        {//connect our gamer
+            bool connected = false;
+            ConnectionPacket P = (ConnectionPacket)p;
+            Player Gamer = new Player();
+            for (int y = 0; y < Server.instance.Players.Count; y++)
             {
-                current = current.Next;
+                if (Server.instance.Players[y].EndPoint.ToString() == (ep.Value).ToString())
+                {
+                    Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
+                    P.playernum = y;
+                    connected = true;
+                }
             }
-            Server.instance.Players[p.playernum].PacketHistory.AddBefore(current, p);
+            if (!connected)
+            {
+
+
+                Gamer.Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;
+                Gamer.damageTaken = 0;
+                Gamer.EndPoint = ep.Value;
+                Gamer.Dummy = Server.instance.EnemyPrefab;//initialize new player
+                Gamer.PacketHistory = new LinkedList<Packet>();
+                Gamer.userName = P.username;
+                P.playernum = Server.instance.Players.Count;
+                Server.instance.Players.Add(Gamer);
+                Server.instance.Players[Server.instance.Players.Count - 1].playernum = Server.instance.Players.Count - 1;
+
+            }
+            P.usernames = new string[Server.instance.Players.Count];
+            for (int i = 0; i < P.usernames.Length; i++)
+            {
+                P.usernames[i] = Server.instance.Players[i].userName;
+            }
+            // Server.instance.socket.SendTo((P).toBytes(), ep.Value);//send back connection packet
+            client.toSendQueue.AddFirst(client.getNode(Server.instance.socket, (P).toBytes(), ep.Value));
         }
+        
         
         if (p is MovementPacket) //this is exacly what it looks like
         {
-
+            print("gotmovementpacket");
             MovementPacket move = (MovementPacket)p;
             LinkedListNode<Packet> node = Server.instance.Players[move.playernum].PacketHistory.First;
-            while (node.Value.timeCreated >= move.timeCreated && node.Next != null)
+            if (node != null)
+            {
+                while (node.Value.timeCreated > move.timeCreated && node.Next != null)
                 {//keep scrolling till we find a node that happened before our movement
                     node = node.Next;
                 }
-            if (node.Value.timeCreated < move.timeCreated)
+                if (node.Value.timeCreated < move.timeCreated)
                 {//insert our movement
-                    Server.instance.Players[move.playernum].PacketHistory.AddAfter(node, move);
+                    Server.instance.Players[move.playernum].PacketHistory.AddBefore(node, move);
                 }
+                
+            }
+            else
+            {
+                Server.instance.Players[move.playernum].PacketHistory.AddFirst(move);
+            }
+            if (Server.instance.Players[move.playernum].PacketHistory.Count >= 100) 
+            {
+                Server.instance.Players[move.playernum].PacketHistory.RemoveLast();
+            }
         }
         if (p is HitPacket)
         {//add our hit to unresolved hits
             HitPacket P = (HitPacket)p;
             
             LinkedListNode<HitAck> curHitack = Server.instance.Confirmed.First;
-            while (p.timeCreated < curHitack.Value.timeCreated) { curHitack = curHitack.Next; }
-            bool contained = (p.id == curHitack.Value.id);
-            
-            bool[] hitsP = Server.instance.TestHit(P);
-
-            bool hit = false;
-            for (int i = 0; i < hitsP.Length; i++)
+            if (curHitack != null)
             {
-                if (hitsP[i])
+                while (p.timeCreated < curHitack.Value.timeCreated) { curHitack = curHitack.Next; }
+                bool contained = (p.id == curHitack.Value.id);
+
+                bool[] hitsP = Server.instance.TestHit(P);
+
+                bool hit = false;
+                for (int i = 0; i < hitsP.Length; i++)
                 {
-                    hit = true;
-                    Server.instance.Players[P.hits[i]].damageTaken += 20;
+                    if (hitsP[i])
+                    {
+                        hit = true;
+                        Server.instance.Players[P.hits[i]].damageTaken += 20;
+                    }
                 }
-            }
-            HitAck hitConfirmation = new HitAck(P,hit);//create a hit confirmation and put it on the stack
-            
-            Server.instance.Resolved.AddFirst(hitConfirmation);
+                HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
 
-        }
-        if (p is ConnectionPacket)
-        {//connect our gamer
-        bool connected = false;
-        ConnectionPacket P = (ConnectionPacket)p;
-        Player Gamer = new Player();
-        for (int y = 0; y < Server.instance.Players.Count; y++)
-        {
-            if (Server.instance.Players[y].EndPoint == (ep.Value))
-            {
-                Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
-                P.playernum = y;
-                connected = true;
+                Server.instance.Resolved.AddFirst(hitConfirmation);
             }
-        }
-        if (!connected)
-        {
-            
-            
-            Gamer.Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;
-            Gamer.damageTaken = 0;
-            Gamer.EndPoint = ep.Value;
-            Gamer.Dummy = Server.instance.EnemyPrefab;//initialize new player
-            Gamer.PacketHistory = new LinkedList<Packet>();
-            Gamer.userName = P.username;
-            P.playernum = Server.instance.Players.Count;
-            Server.instance.Players.Add(Gamer);
-            Server.instance.Players[Server.instance.Players.Count - 1].playernum = Server.instance.Players.Count - 1;
-            
-        }
-            P.usernames = new string[Server.instance.Players.Count];
-            for (int i = 0; i < P.usernames.Length; i++)
-            {
-                P.usernames[i] = Server.instance.Players[i].userName; 
-            }
-        Server.instance.socket.SendTo((P).toBytes(), ep.Value);//send back connection packet
         }
         if (p is HitAck) 
         {

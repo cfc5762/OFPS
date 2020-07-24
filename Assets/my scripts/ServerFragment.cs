@@ -10,8 +10,18 @@ public class ServerFragment
     public DateTime timeCreated;
     public int playernum;
     public int delay;
-    public Quaternion Rotation;
-    public Vector3 position;
+    public Tuple<float,float,float>_position;
+    public Vector3 position 
+    {
+        get{ return new Vector3(_position.Item1, _position.Item2, _position.Item3); }
+        set { _position = new Tuple<float, float, float>(value.x, value.y, value.z); }
+    }
+    public Tuple<float, float, float, float> _lookrotation;
+    public Quaternion Rotation
+    {
+        get { return new Quaternion(_lookrotation.Item1, _lookrotation.Item2, _lookrotation.Item3, _lookrotation.Item4); }
+        set { _lookrotation = new Tuple<float, float, float, float>(value.x, value.y, value.z, value.w); }
+    }
     public int damageTaken;
     public byte[] toBytes() 
     {

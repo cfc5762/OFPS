@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class HitAck:Packet
 {
-    public HitAck(HitPacket p,bool h) : base(p.playernum, p.FromUser) 
+    public HitAck(HitPacket p,bool h) : base(p.playernum) 
     {
         timeCreated = p.timeCreated;
         hit = h;
