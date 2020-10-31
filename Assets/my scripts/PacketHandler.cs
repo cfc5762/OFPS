@@ -26,12 +26,15 @@ public class PacketHandler : MonoBehaviour
     }
     public void OffloadClient(byte[] P, IPEndPoint e) 
     {
-        if (e == client.server) 
-        {//if we got it from the server offload 
-            client.instance.Queue.AddFirst(P);
+        if (P != null && e != null)
+        {
+            if (e == client.server)
+            {//if we got it from the server offload 
+                client.instance.Queue.AddFirst(P);
+            }
         }
     }
-    public void Offload(byte[] P,IPEndPoint e)
+    public void OffloadServer(byte[] P,IPEndPoint e)
     {//offload with endpoints to the queue to be processed
         Server.instance.EndPoints.AddFirst((IPEndPoint)e);
         Server.instance.Queue.AddFirst(P);
@@ -93,7 +96,7 @@ public class PacketHandler : MonoBehaviour
     }
     public void ServerHandlePacket(Packet p,LinkedListNode<IPEndPoint> ep) 
     {
-        p.FromUser = ep.Value;
+        
         if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p)&&p is MovementPacket)//contains positional data
         {
             LinkedListNode<Packet> current = Server.instance.Players[p.playernum].PacketHistory.First;
@@ -102,6 +105,7 @@ public class PacketHandler : MonoBehaviour
                 current = current.Next;
             }
             Server.instance.Players[p.playernum].PacketHistory.AddBefore(current, p);
+            Server.instance.Players[p.playernum].EndPoint = ep.Value;
         }
         
         if (p is MovementPacket) //this is exacly what it looks like
@@ -152,30 +156,27 @@ public class PacketHandler : MonoBehaviour
             if (Server.instance.Players[y].EndPoint == (ep.Value))
             {
                 Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
-                P.playernum = y;
+                P.playernum = (short)y;
                 connected = true;
             }
         }
         if (!connected)
         {
-            
-            
             Gamer.Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;
             Gamer.damageTaken = 0;
             Gamer.EndPoint = ep.Value;
             Gamer.Dummy = Server.instance.EnemyPrefab;//initialize new player
             Gamer.PacketHistory = new LinkedList<Packet>();
             Gamer.userName = P.username;
-            P.playernum = Server.instance.Players.Count;
+            P.playernum = (short)Server.instance.Players.Count;
             Server.instance.Players.Add(Gamer);
             Server.instance.Players[Server.instance.Players.Count - 1].playernum = Server.instance.Players.Count - 1;
-            
         }
             P.usernames = new string[Server.instance.Players.Count];
-            for (int i = 0; i < P.usernames.Length; i++)
-            {
-                P.usernames[i] = Server.instance.Players[i].userName; 
-            }
+        for (int i = 0; i < P.usernames.Length; i++)
+        {
+            P.usernames[i] = Server.instance.Players[i].userName; 
+        }
         Server.instance.socket.SendTo((P).toBytes(), ep.Value);//send back connection packet
         }
         if (p is HitAck) 

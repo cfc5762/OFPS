@@ -33,7 +33,7 @@ public class Server : MonoBehaviour
         else
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
+            
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0,0,0,0}), 28960));//listen on any address on this port
 
@@ -75,7 +75,7 @@ public class Server : MonoBehaviour
                     GameObject temp = Instantiate(EnemyPrefab);
                     temp.transform.position = playerposition;
                     temp.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
-                    if (Physics.Raycast(H.CameraLocation, H.normal)&&Players[H.playernum].damageTaken<100)
+                    if (Physics.Raycast(H.CameraLocation, H.normal)&&Players[H.playernum].damageTaken<100)//needs work
                     {
                         Confirms[i] = true;
                     }
@@ -135,7 +135,7 @@ public class Server : MonoBehaviour
         byte[] b = new byte[1024];
         EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
         Forwarded.ReceiveFrom(b,ref sender);
-        PacketHandler.instance.Offload(b,(IPEndPoint)sender);
+        PacketHandler.instance.OffloadServer(b,(IPEndPoint)sender);
         if (recieving)//continue the thread if we aer still recieving
             Recieve(Forwarded);
        
@@ -173,10 +173,10 @@ public class Server : MonoBehaviour
         for (int x = 0; x < Players.Count; x++)
         {//make a fraghment for each player
             ServerFragment player = new ServerFragment();
-            player.playernum = x;
-            player.damageTaken = Players[x].damageTaken;
+            player.playernum = (short)x;
+            player.damageTaken = (short)Players[x].damageTaken;
             LinkedListNode<Packet> lastMVPK = Players[x].PacketHistory.First;
-            player.delay = (int)Players[x].Delay;
+            player.delay = (short)Players[x].Delay;
             player.timeCreated = lastMVPK.Value.timeCreated;
             player.position = ((MovementPacket)lastMVPK.Value).position;
             player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
@@ -190,7 +190,7 @@ public class Server : MonoBehaviour
         LinkedListNode<HitAck> current = Resolved.Last;
         for (int i = 0; i < Resolved.Count; i++)
         {
-            instance.socket.SendTo(current.Value.toBytes(), current.Value.FromUser);
+            instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);
             LinkedListNode<HitAck> placeBefore = Confirmed.First;
             for (int j = 0; j < Confirmed.Count; j++)
             {

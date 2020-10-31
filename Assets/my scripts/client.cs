@@ -3,7 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
+
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class client : MonoBehaviour
@@ -20,7 +21,6 @@ public class client : MonoBehaviour
     public IPEndPoint localEp;
     public static IPEndPoint server;//needs to be set outside of this script before scene load
     public static string username;//needs to be set outside of this script before scene load
-    Thread recieveThread;
     public Socket socket;
     public List<Player> Players = new List<Player>();
     public static IPAddress GetLocalIPAddress()
@@ -56,16 +56,13 @@ public class client : MonoBehaviour
             socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);
             socket.Bind(localEp);
             playing = true;
-
+            instance = this;
             StartCoroutine(ConnectionTick());
             StartCoroutine(MovementTick());
-
-
-            instance = this;
-            //Recieve();
-             recieveThread = new Thread(() => { Recieve(); });
-             recieveThread.Start();
-            DontDestroyOnLoad(gameObject);
+            Recieve();
+            Recieve();
+            Recieve();
+            //DontDestroyOnLoad(gameObject);
         }
     }
     
@@ -83,42 +80,60 @@ public class client : MonoBehaviour
         {
             if (lastConnectionPacket != null)
             {
-                socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server);
+
+
+                Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server));
             }
             else 
             {
-                EndPoint e = new IPEndPoint(GetLocalIPAddress(), 28960);
-                socket.SendTo((new ConnectionPacket(username)).toBytes(), e);
+                EndPoint e = new IPEndPoint(GetLocalIPAddress(), 7777);
+                Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), e));
+                
+                
             }
-            yield return new WaitForSeconds(3);
+            yield return new WaitForSecondsRealtime(3);
         }    
     }
     IEnumerator MovementTick()
     {
         while (playing && lastConnectionPacket != null) 
         {
-            MovementPacket movement = new MovementPacket(FpsController.transform, lastConnectionPacket.playernum);//construct a movement packet out of our player
-            LinkedListNode<HitPacket> shot = unConfirmed.Last;
-            for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+            Task.Run(() =>
             {
-                socket.SendTo(shot.Value.toBytes(), server);
-                if (shot.Previous == null)
-                    break;
-                shot = shot.Previous;
-            }
-            socket.SendTo(movement.toBytes(), server);//send movement packet
-            yield return new WaitForSeconds(1f / 120f);
+                MovementPacket movement = new MovementPacket(FpsController.transform, lastConnectionPacket.playernum);//construct a movement packet out of our player
+                LinkedListNode<HitPacket> shot = unConfirmed.Last;
+                for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+                {
+                    socket.SendTo(shot.Value.toBytes(), server);
+                    if (shot.Previous == null)
+                        break;
+                    shot = shot.Previous;
+                }
+                socket.SendTo(movement.toBytes(), server);
+            });
+
+            
+            yield return new WaitForSecondsRealtime(1f / 120f);
         }
     }
     void Recieve()
     {
-        while (playing)
+        socket.ReceiveTimeout = (1000);
+        socket.Blocking = false;
+        Task.Run(() =>
         {
             byte[] b = new byte[1024];
             EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
-            socket.ReceiveFrom(b, ref wanderingGamer);
-            PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
-        }
+            while (playing)
+            {
+                if (socket.Available>0)
+                {
+                    socket.ReceiveFrom(b, ref wanderingGamer);
+                    PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
+                }                
+            }
+        });
+        
         
     }
     private void FixedUpdate()
@@ -157,7 +172,7 @@ public class client : MonoBehaviour
                     Vector3 i = (((MovementPacket)player.PacketHistory.First.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (i - 2 * n * Vector3.Dot(i, n));
-                    float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;
+                    float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;//place the enemy players with magic
                     Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint.normalized * avgSpeed * Mathf.Clamp(((float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, .75f));
                     player.Dummy.transform.position = playerposition;
                     player.Dummy.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));

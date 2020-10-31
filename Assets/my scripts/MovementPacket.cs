@@ -10,28 +10,22 @@ public class MovementPacket : Packet
     {
         position = t.position;
         lookrotation = t.rotation;
-        command = "";
-    }
-    public MovementPacket(Transform t,int num, IPEndPoint ep) : base(num,ep)
-    {
-        position = t.position;
-        lookrotation = t.rotation;
-        command = "";
+        command = 0;
     }
     public MovementPacket(Transform t, int num) : base(num)
     {
         position = t.position;
         lookrotation = t.rotation;
-        command = "";
+        command = 0;
     }
     public MovementPacket(Vector3 p,Quaternion r, int num) : base(num)
     {
         position = p;
         lookrotation = r;
-        command = "";
+        command = 0;
     }
     public override string id { get { return base.id + "-m"; } }
     public Vector3 position;
     public Quaternion lookrotation;
-    public string command;
+    public byte command;
 }
