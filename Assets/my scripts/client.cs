@@ -60,8 +60,6 @@ public class client : MonoBehaviour
             StartCoroutine(ConnectionTick());
             StartCoroutine(MovementTick());
             Recieve();
-            Recieve();
-            Recieve();
             //DontDestroyOnLoad(gameObject);
         }
     }
@@ -166,7 +164,7 @@ public class client : MonoBehaviour
             {
                 if (player.PacketHistory.Count > 2)
                 {
-
+                    // this graph explains this block https://gyazo.com/f242ed66b95169f5cf85347ccee5f671
                     Vector3 n_nocross = (((MovementPacket)player.PacketHistory.First.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Value).position);
                     Vector3 n = Vector3.Cross(n_nocross, Vector3.up);
                     Vector3 i = (((MovementPacket)player.PacketHistory.First.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
