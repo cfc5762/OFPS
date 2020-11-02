@@ -18,9 +18,8 @@ public class Server : MonoBehaviour
     public List<Player> Players = new List<Player>();
     public LinkedList<IPEndPoint> EndPoints = new LinkedList<IPEndPoint>();
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
-    
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
-    public LinkedList<HitAck> Confirmed = new LinkedList<HitAck>();
+    public LinkedList<HitAck> Unresolved = new LinkedList<HitAck>();
     public Thread recv;
     public static Server instance;
     // Start is called before the first frame update
@@ -147,8 +146,6 @@ public class Server : MonoBehaviour
         LinkedListNode<IPEndPoint> ep = instance.EndPoints.Last;
         for (int i = 0; i < instance.Queue.Count; i++)
         {
-            try
-            {
                 BinaryFormatter b = new BinaryFormatter();
                 MemoryStream m = new MemoryStream(buff.Value);
                 var pack_ = b.Deserialize(m);
@@ -163,20 +160,15 @@ public class Server : MonoBehaviour
                 ep = ep.Previous;
                 instance.Queue.RemoveLast();
                 instance.EndPoints.RemoveLast();
-            }
-            catch (Exception e)
-            {
-
-            }
-            
         }
-        for (int x = 0; x < Players.Count; x++)
+        Player[] p = Players.ToArray();
+        for (int x = 0; x < p.Length; x++)
         {//make a fraghment for each player
             ServerFragment player = new ServerFragment();
             player.playernum = (short)x;
-            player.damageTaken = (short)Players[x].damageTaken;
-            LinkedListNode<Packet> lastMVPK = Players[x].PacketHistory.First;
-            player.delay = (short)Players[x].Delay;
+            player.damageTaken = (short)p[x].damageTaken;
+            LinkedListNode<Packet> lastMVPK = p[x].PacketHistory.First;
+            player.delay = (short)p[x].Delay;
             player.timeCreated = lastMVPK.Value.timeCreated;
             player.position = ((MovementPacket)lastMVPK.Value).position;
             player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
@@ -191,12 +183,12 @@ public class Server : MonoBehaviour
         for (int i = 0; i < Resolved.Count; i++)
         {
             instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);
-            LinkedListNode<HitAck> placeBefore = Confirmed.First;
-            for (int j = 0; j < Confirmed.Count; j++)
+            LinkedListNode<HitAck> placeBefore = Unresolved.First;
+            for (int j = 0; j < Unresolved.Count; j++)
             {
                 if (current.Value.timeCreated >= placeBefore.Value.timeCreated && current.Value != placeBefore.Value)//happened after placebefore (most recent at front)
                 {
-                    Confirmed.AddBefore(placeBefore, current.Value);
+                    Unresolved.AddBefore(placeBefore, current.Value);
                     break;
                 }
                 else if (current.Value == placeBefore.Value) 
@@ -205,7 +197,7 @@ public class Server : MonoBehaviour
                 }
                 else if (placeBefore.Next == null)
                 {
-                    Confirmed.AddAfter(placeBefore, current.Value);
+                    Unresolved.AddAfter(placeBefore, current.Value);
                     break;
                 }
                 else 

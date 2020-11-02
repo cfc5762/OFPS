@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityStandardAssets.SceneUtils;
 
 public class PacketHandler : MonoBehaviour
 {
@@ -21,7 +22,6 @@ public class PacketHandler : MonoBehaviour
         else
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
         }
     }
     public void OffloadClient(byte[] P, IPEndPoint e) 
@@ -78,56 +78,57 @@ public class PacketHandler : MonoBehaviour
     {
         while (s.playernum >= client.instance.Players.Count) //their playernum is higher than our max players
         {
-            Player player = new Player();
-            player.EndPoint = client.server;
-            player.playernum = client.instance.Players.Count;
-            player.Dummy = Instantiate(client.instance.EnemyPrefab);
-            player.Dummy.transform.position = new Vector3(0, 1000, 0);
+            makeNewPlayerClient(s);
         }
         MovementPacket m = new MovementPacket(s.position,s.Rotation,s.playernum);//movement packet of the enemy
         m.timeCreated = s.timeCreated;//make sure they are identical
-        client.instance.Players[s.playernum].PacketHistory.AddFirst(m);//add it to the players packethistory
-        client.instance.Players[s.playernum].Delay = s.delay;
+        LinkedListNode<Packet> node;
+        placeInOrder(client.instance.Players[s.playernum].PacketHistory,m, out node);
+        client.instance.Players[s.playernum].playernum = s.playernum;
+        //client.instance.Players[s.playernum].Delay = s.delay; not implemented yet
         Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();//adjust the Enemy component
         enemy.username = client.instance.Players[s.playernum].userName;
         enemy.health = 100 - s.damageTaken; 
         
         
     }
+    public static void makeNewPlayerClient(ServerFragment s) 
+    {
+        print("making new player for the client");
+        Player player = new Player();
+        player.EndPoint = client.server;
+        player.playernum = client.instance.Players.Count;
+        player.Dummy = Instantiate(client.instance.EnemyPrefab);
+        player.Dummy.transform.position = new Vector3(0, 1000, 0);
+        player.playernum = s.playernum;
+        client.instance.Players.Add(player);
+    }
+   
+    public static void placeInOrder(LinkedList<Packet> l, Packet p, out LinkedListNode<Packet> current) 
+    {
+        LinkedListNode<Packet> node = l.First;
+        while (p.timeCreated <= node.Value.timeCreated)//is our current node in the packet history younger than the packet
+        {
+            node = node.Next;//move further into the past
+        }
+        l.AddBefore(node, p);//add our packet right before the first packet that occured futher in the past
+        current = node.Previous;
+    }
     public void ServerHandlePacket(Packet p,LinkedListNode<IPEndPoint> ep) 
     {
         
         if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p)&&p is MovementPacket)//contains positional data
         {
-            LinkedListNode<Packet> current = Server.instance.Players[p.playernum].PacketHistory.First;
-            while (p.timeCreated<=current.Value.timeCreated)
-            {
-                current = current.Next;
-            }
-            Server.instance.Players[p.playernum].PacketHistory.AddBefore(current, p);
-            Server.instance.Players[p.playernum].EndPoint = ep.Value;
-        }
-        
-        if (p is MovementPacket) //this is exacly what it looks like
-        {
-
-            MovementPacket move = (MovementPacket)p;
-            LinkedListNode<Packet> node = Server.instance.Players[move.playernum].PacketHistory.First;
-            while (node.Value.timeCreated >= move.timeCreated && node.Next != null)
-                {//keep scrolling till we find a node that happened before our movement
-                    node = node.Next;
-                }
-            if (node.Value.timeCreated < move.timeCreated)
-                {//insert our movement
-                    Server.instance.Players[move.playernum].PacketHistory.AddAfter(node, move);
-                }
+            LinkedListNode<Packet> current;
+            placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);
+            Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint         
         }
         if (p is HitPacket)
         {//add our hit to unresolved hits
             HitPacket P = (HitPacket)p;
             
-            LinkedListNode<HitAck> curHitack = Server.instance.Confirmed.First;
-            while (p.timeCreated < curHitack.Value.timeCreated) { curHitack = curHitack.Next; }
+            LinkedListNode<HitAck> curHitack = Server.instance.Unresolved.First;
+            while (p.timeCreated <= curHitack.Value.timeCreated) { curHitack = curHitack.Next; }
             bool contained = (p.id == curHitack.Value.id);
             
             bool[] hitsP = Server.instance.TestHit(P);
@@ -157,7 +158,8 @@ public class PacketHandler : MonoBehaviour
             {
                 Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
                 P.playernum = (short)y;
-                connected = true;
+                
+                connected = true;//gamer is already here update delay
             }
         }
         if (!connected)
@@ -168,11 +170,12 @@ public class PacketHandler : MonoBehaviour
             Gamer.Dummy = Server.instance.EnemyPrefab;//initialize new player
             Gamer.PacketHistory = new LinkedList<Packet>();
             Gamer.userName = P.username;
+            Gamer.playernum = (short)Server.instance.Players.Count;
             P.playernum = (short)Server.instance.Players.Count;
             Server.instance.Players.Add(Gamer);
-            Server.instance.Players[Server.instance.Players.Count - 1].playernum = Server.instance.Players.Count - 1;
+            
         }
-            P.usernames = new string[Server.instance.Players.Count];
+        P.usernames = new string[Server.instance.Players.Count];
         for (int i = 0; i < P.usernames.Length; i++)
         {
             P.usernames[i] = Server.instance.Players[i].userName; 
