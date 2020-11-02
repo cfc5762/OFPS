@@ -6,6 +6,7 @@ using System.Net.Sockets;
 
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 
 public class client : MonoBehaviour
 {
@@ -44,8 +45,8 @@ public class client : MonoBehaviour
     {
         
         username = "silktail";
-        server = new IPEndPoint(GetLocalIPAddress(), 28960);
-        localEp = new IPEndPoint(GetLocalIPAddress(), 28960);
+        server = new IPEndPoint(GetLocalIPAddress(), 7777);
+        
         if (instance != null && instance != this)
         {
             gameObject.SetActive(false);
@@ -54,7 +55,7 @@ public class client : MonoBehaviour
         {   
             unConfirmed = new LinkedList<HitPacket>();
             socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);
-            socket.Bind(localEp);
+            
             playing = true;
             instance = this;
             StartCoroutine(ConnectionTick());
@@ -116,6 +117,7 @@ public class client : MonoBehaviour
     }
     void Recieve()
     {
+        localEp = (IPEndPoint)socket.LocalEndPoint;
         socket.ReceiveTimeout = (1000);
         socket.Blocking = false;
         Task.Run(() =>

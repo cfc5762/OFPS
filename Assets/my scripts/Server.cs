@@ -33,10 +33,7 @@ public class Server : MonoBehaviour
         {
             instance = this;
             recieving = true;
-            Recieve();
-            
-            
-            
+            Recieve();    
         }
         
     }
