@@ -42,7 +42,7 @@ public class PacketHandler : MonoBehaviour
     }
     public static void makeNewPlayerClient(ConnectionPacket P)
     {
-        print("making "+P.username+" for the client");
+        Debug.Log("making "+P.username+" for the client");
         Player player = new Player();
         player.EndPoint = client.server;
         player.playernum = P.playernum;
@@ -50,7 +50,7 @@ public class PacketHandler : MonoBehaviour
     }
     public static void makeNewPlayerClient(ServerFragment s) 
     {
-        print("making new player for the client");
+        Debug.Log("making new player for the client");
         Player player = new Player();
         player.EndPoint = client.server;
         player.playernum = client.instance.Players.Count;

@@ -45,7 +45,7 @@ public class client : MonoBehaviour
     // Start is called before the first frame update
     void Awake()
     {
-        
+        lastConnectionPacket = new ConnectionPacket();
         username = "silktail";
         server = new IPEndPoint(GetLocalIPAddress(), 7777);
         
@@ -54,7 +54,8 @@ public class client : MonoBehaviour
             gameObject.SetActive(false);
         }
         else
-        {   
+        {
+            
             unConfirmed = new LinkedList<HitPacket>();
             socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);
             
@@ -81,7 +82,7 @@ public class client : MonoBehaviour
         if (p is ConnectionPacket)
         {
             ConnectionPacket P = (ConnectionPacket)p;
-            if (lastConnectionPacket == null) 
+            if (lastConnectionPacket == new ConnectionPacket()) 
             {
                 PacketHandler.makeNewPlayerClient(P);
             }
@@ -139,7 +140,7 @@ public class client : MonoBehaviour
     {
         while (playing) 
         {
-            if (lastConnectionPacket != null)
+            if (lastConnectionPacket != new ConnectionPacket())
             {
 
 
@@ -159,7 +160,7 @@ public class client : MonoBehaviour
     {
         while (playing) 
         {
-            MovementPacket movement = new MovementPacket(FpsController.transform.position,FpsController.transform.rotation, lastConnectionPacket.playernum);//construct a movement packet out of our player
+            MovementPacket movement = new MovementPacket(FpsController.transform.position,FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
             LinkedListNode<HitPacket> shot = unConfirmed.Last;
             Task.Run(() =>
             {
@@ -266,4 +267,5 @@ public class client : MonoBehaviour
             }
         }
     }
+    
 }

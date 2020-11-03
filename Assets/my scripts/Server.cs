@@ -70,7 +70,7 @@ public class Server : MonoBehaviour
             }
             Task.Run(() => { Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value); });//send back connection packet
         }
-        else if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
+        else if (p.playernum!=1000&&!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
         {
             if (p is MovementPacket)//contains positional data
             {
