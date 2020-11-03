@@ -46,13 +46,39 @@ public class Server : MonoBehaviour
     }
     public void ServerHandlePacket(Packet p, LinkedListNode<IPEndPoint> ep)
     {
-        if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
+        if (p is ConnectionPacket)
+        {//connect our gamer
+            bool connected = false;
+            ConnectionPacket connPacket = (ConnectionPacket)p;
+            for (int y = 0; y < Server.instance.Players.Count; y++)
+            {
+                if (Server.instance.Players[y].EndPoint.Port == (ep.Value).Port&& Server.instance.Players[y].EndPoint.Address.ToString() == (ep.Value).Address.ToString())
+                {
+                    Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
+                    connPacket.playernum = (short)y;
+                    connected = true;//gamer is already here update delay
+                }
+            }
+            if (!connected)//if the player is not in our list of players make a new one
+            {
+                PacketHandler.makeNewPlayerServer(connPacket, ep);
+            }
+            connPacket.usernames = new string[Server.instance.Players.Count];//update the user list on the outgoing packet
+            for (int i = 0; i < connPacket.usernames.Length; i++)
+            {
+                connPacket.usernames[i] = Server.instance.Players[i].userName;
+            }
+            Task.Run(() => { Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value); });//send back connection packet
+        }
+        else if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
         {
             if (p is MovementPacket)//contains positional data
             {
                 LinkedListNode<Packet> current;
                 PacketHandler.placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);//put it in the queue where we read from to determine position
-                Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint         
+                print(((MovementPacket)p).position);
+                Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint
+                
             }
             else if (p is HitAck)
             {
@@ -75,30 +101,7 @@ public class Server : MonoBehaviour
                 HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
                 Server.instance.Resolved.AddFirst(hitConfirmation);
             }
-            else if (p is ConnectionPacket)
-            {//connect our gamer
-                bool connected = false;
-                ConnectionPacket connPacket = (ConnectionPacket)p;
-                for (int y = 0; y < Server.instance.Players.Count; y++)
-                {
-                    if (Server.instance.Players[y].EndPoint == (ep.Value))
-                    {
-                        Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
-                        connPacket.playernum = (short)y;
-                        connected = true;//gamer is already here update delay
-                    }
-                }
-                if (!connected)//if the player is not in our list of players make a new one
-                {
-                    PacketHandler.makeNewPlayerServer(connPacket, ep);
-                }
-                connPacket.usernames = new string[Server.instance.Players.Count];//update the user list on the outgoing packet
-                for (int i = 0; i < connPacket.usernames.Length; i++)
-                {
-                    connPacket.usernames[i] = Server.instance.Players[i].userName;
-                }
-                Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value);//send back connection packet
-            }
+            
 
         }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,7 +29,7 @@ public class PacketHandler : MonoBehaviour
     {
         if (P != null && e != null)
         {
-            if (e == client.server)
+            if (e.Address.ToString() == client.server.Address.ToString()&&e.Port==client.server.Port)
             {//if we got it from the server offload 
                 client.instance.Queue.AddFirst(P);
             }
@@ -38,6 +39,14 @@ public class PacketHandler : MonoBehaviour
     {//offload with endpoints to the queue to be processed
         Server.instance.EndPoints.AddFirst((IPEndPoint)e);
         Server.instance.Queue.AddFirst(P);
+    }
+    public static void makeNewPlayerClient(ConnectionPacket P)
+    {
+        print("making "+P.username+" for the client");
+        Player player = new Player();
+        player.EndPoint = client.server;
+        player.playernum = P.playernum;
+        client.instance.Players.Add(player);
     }
     public static void makeNewPlayerClient(ServerFragment s) 
     {
@@ -66,13 +75,37 @@ public class PacketHandler : MonoBehaviour
    
     public static void placeInOrder(LinkedList<Packet> l, Packet p, out LinkedListNode<Packet> current) 
     {
+        bool addBefore = true;
+        current = null;
         LinkedListNode<Packet> node = l.First;
-        while (p.timeCreated >= node.Value.timeCreated)//is our current node in the packet history younger than the packet
+        if (node != null)
         {
-            node = node.Next;//move further into the past
+            while (p.timeCreated >= node.Value.timeCreated)//is our current node in the packet history younger than the packet
+            {
+                if (node.Next != null)
+                    node = node.Next;//move further into the past
+                else 
+                {
+                    addBefore = false;
+                    break;
+                }
+            }
+            if (addBefore)
+            {
+                l.AddBefore(node, p);//add our packet right before the first packet that occured futher in the past
+                current = node.Previous;
+            }
+            else 
+            {
+                l.AddAfter(node, p);
+            }
         }
-        l.AddBefore(node, p);//add our packet right before the first packet that occured futher in the past
-        current = node.Previous;
+        else 
+        {
+            l.AddFirst(p);
+        }
+        
+        
     }
    
 

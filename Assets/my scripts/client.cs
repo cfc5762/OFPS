@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+
 using System.Net;
 using System.Net.Sockets;
-
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
@@ -79,7 +81,13 @@ public class client : MonoBehaviour
         if (p is ConnectionPacket)
         {
             ConnectionPacket P = (ConnectionPacket)p;
-
+            if (lastConnectionPacket == null) 
+            {
+                PacketHandler.makeNewPlayerClient(P);
+            }
+            lastConnectionPacket = P;
+            myPlayerNum = P.playernum;
+            
             for (int i = 0; i < client.instance.Players.Count; i++)
             {
                 client.instance.Players[i].userName = P.usernames[i];
@@ -149,20 +157,23 @@ public class client : MonoBehaviour
     }
     IEnumerator MovementTick()
     {
-        while (playing && lastConnectionPacket != null) 
+        while (playing) 
         {
+            MovementPacket movement = new MovementPacket(FpsController.transform.position,FpsController.transform.rotation, lastConnectionPacket.playernum);//construct a movement packet out of our player
+            LinkedListNode<HitPacket> shot = unConfirmed.Last;
             Task.Run(() =>
             {
-                MovementPacket movement = new MovementPacket(FpsController.transform, lastConnectionPacket.playernum);//construct a movement packet out of our player
-                LinkedListNode<HitPacket> shot = unConfirmed.Last;
-                for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
-                {
-                    socket.SendTo(shot.Value.toBytes(), server);
-                    if (shot.Previous == null)
-                        break;
-                    shot = shot.Previous;
-                }
-                socket.SendTo(movement.toBytes(), server);
+                
+                    
+                    //for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+                    //{
+                    //    socket.SendTo(shot.Value.toBytes(), server);
+                    //    if (shot.Previous == null)
+                    //        break;
+                    //    shot = shot.Previous;
+                    //}
+                    socket.SendTo(movement.toBytes(), server);
+                
             });
 
             
@@ -192,6 +203,21 @@ public class client : MonoBehaviour
     }
     private void FixedUpdate()
     {
+        LinkedListNode<byte[]> buff = instance.Queue.Last;
+        int count = instance.Queue.Count;//prevent modifying changing elements
+        for (int i = 0; i < count; i++)
+        {
+            BinaryFormatter b = new BinaryFormatter();
+            MemoryStream m = new MemoryStream(buff.Value);
+            var pack_ = b.Deserialize(m);
+            if (pack_ is Packet)
+            {
+                clientHandlePacket((Packet)pack_);
+            }
+            //integrate the buffer and endpoint down the queue
+            buff = buff.Previous;
+            instance.Queue.RemoveLast();
+        }
         if (Input.GetMouseButtonDown(0)&&client.cam != null) 
         {
             RaycastHit hit;
