@@ -20,7 +20,6 @@ public class Server : MonoBehaviour
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
     public LinkedList<HitAck> Unresolved = new LinkedList<HitAck>();
-    public Thread recv;
     public static Server instance;
     // Start is called before the first frame update
     void Awake()//set the server singleton
@@ -130,7 +129,7 @@ public class Server : MonoBehaviour
 
         Task.Run(() =>
         {
-            socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 28960));//listen on any address on this port
+            socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
             byte[] b = new byte[1024];
             EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
             while (recieving)
