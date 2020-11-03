@@ -44,6 +44,65 @@ public class Server : MonoBehaviour
     {
         recieving = false;
     }
+    public void ServerHandlePacket(Packet p, LinkedListNode<IPEndPoint> ep)
+    {
+        if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
+        {
+            if (p is MovementPacket)//contains positional data
+            {
+                LinkedListNode<Packet> current;
+                PacketHandler.placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);//put it in the queue where we read from to determine position
+                Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint         
+            }
+            else if (p is HitAck)
+            {
+                if (Server.instance.Resolved.Contains((HitAck)p))//stop sending a resolved hit to the user once we get it back
+                    Server.instance.Resolved.Remove((HitAck)p);
+            }
+            else if (p is HitPacket)
+            {
+                HitPacket P = (HitPacket)p;
+                bool[] hitsP = Server.instance.TestHit(P);//test hit
+                bool hit = false;
+                for (int i = 0; i < hitsP.Length; i++)
+                {// resolve hit here
+                    if (hitsP[i])
+                    {
+                        hit = true;
+                        Server.instance.Players[P.hits[i]].damageTaken += 20;//make this a delegate later?
+                    }
+                }
+                HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
+                Server.instance.Resolved.AddFirst(hitConfirmation);
+            }
+            else if (p is ConnectionPacket)
+            {//connect our gamer
+                bool connected = false;
+                ConnectionPacket connPacket = (ConnectionPacket)p;
+                for (int y = 0; y < Server.instance.Players.Count; y++)
+                {
+                    if (Server.instance.Players[y].EndPoint == (ep.Value))
+                    {
+                        Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
+                        connPacket.playernum = (short)y;
+                        connected = true;//gamer is already here update delay
+                    }
+                }
+                if (!connected)//if the player is not in our list of players make a new one
+                {
+                    PacketHandler.makeNewPlayerServer(connPacket, ep);
+                }
+                connPacket.usernames = new string[Server.instance.Players.Count];//update the user list on the outgoing packet
+                for (int i = 0; i < connPacket.usernames.Length; i++)
+                {
+                    connPacket.usernames[i] = Server.instance.Players[i].userName;
+                }
+                Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value);//send back connection packet
+            }
+
+        }
+
+    }
     public bool[] TestHit(HitPacket H)//returns an array of which enemies we hit with a given hitpacket
     {
         bool[] Confirms = new bool[H.hits.Length];
@@ -126,7 +185,6 @@ public class Server : MonoBehaviour
        
         socket.ReceiveTimeout = (1000);
         socket.Blocking = false;
-
         Task.Run(() =>
         {
             socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
@@ -154,11 +212,9 @@ public class Server : MonoBehaviour
                 BinaryFormatter b = new BinaryFormatter();
                 MemoryStream m = new MemoryStream(buff.Value);
                 var pack_ = b.Deserialize(m);
-                
-                
                 if (pack_ is Packet) 
                 {
-                    PacketHandler.instance.ServerHandlePacket((Packet)pack_, ep);
+                    ServerHandlePacket((Packet)pack_, ep);
                 }
                 //integrate the buffer and endpoint down the queue
                 buff = buff.Previous;
@@ -186,10 +242,6 @@ public class Server : MonoBehaviour
                     socket.SendTo(player.toBytes(), Players[y].EndPoint);
                 }
             }
-       
-        
-       
-        
             for (int i = 0; i < count; i++)
             {
                 instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);//send resolved packet until we get acknowledgement

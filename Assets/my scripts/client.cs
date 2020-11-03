@@ -61,7 +61,7 @@ public class client : MonoBehaviour
             StartCoroutine(ConnectionTick());
             StartCoroutine(MovementTick());
             Recieve();
-            //DontDestroyOnLoad(gameObject);
+            
         }
     }
     
@@ -72,6 +72,60 @@ public class client : MonoBehaviour
     private void OnApplicationQuit()
     {
         playing = false;
+    }
+    public void clientHandlePacket(Packet p)
+    {
+        //if its a connection packet log the interaction
+        if (p is ConnectionPacket)
+        {
+            ConnectionPacket P = (ConnectionPacket)p;
+
+            for (int i = 0; i < client.instance.Players.Count; i++)
+            {
+                client.instance.Players[i].userName = P.usernames[i];
+            }
+        }
+        //if its a hit acknowledgement we send it back after removing the correct node from unconfirmed
+        if (p is HitAck)
+        {
+            HitAck P = (HitAck)p;
+            LinkedListNode<HitPacket> unconfirmed = client.instance.unConfirmed.First;
+            int j = client.instance.unConfirmed.Count;
+            for (int i = 0; i < j; i++)
+            {
+                if (unconfirmed.Value.id == P.id)
+                {
+
+                    unconfirmed = unconfirmed.Next;
+                    client.instance.unConfirmed.Remove(unconfirmed.Previous);
+                    //hitmarker happens here
+                    break;
+                }
+                else
+                {
+                    unconfirmed = unconfirmed.Next;
+                }
+            }
+            client.instance.socket.SendTo(P.toBytes(), client.server);
+
+        }
+    }
+    public void clientHandlePacket(ServerFragment s)
+    {
+        while (s.playernum >= client.instance.Players.Count) //their playernum is higher than our max players
+        {
+            PacketHandler.makeNewPlayerClient(s);
+        }
+        MovementPacket m = new MovementPacket(s.position, s.Rotation, s.playernum);//movement packet of the enemy
+        m.timeCreated = s.timeCreated;//make sure they are identical
+        LinkedListNode<Packet> node;
+        PacketHandler.placeInOrder(client.instance.Players[s.playernum].PacketHistory, m, out node);
+        client.instance.Players[s.playernum].playernum = s.playernum;
+        Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();//adjust the Enemy component
+        enemy.username = client.instance.Players[s.playernum].userName;
+        enemy.health = 100 - s.damageTaken;
+
+
     }
     IEnumerator ConnectionTick() 
     {

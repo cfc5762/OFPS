@@ -39,59 +39,6 @@ public class PacketHandler : MonoBehaviour
         Server.instance.EndPoints.AddFirst((IPEndPoint)e);
         Server.instance.Queue.AddFirst(P);
     }
-    public void clientHandlePacket(Packet p)
-    {
-        //if its a connection packet log the interaction
-        if (p is ConnectionPacket) 
-        {
-            ConnectionPacket P = (ConnectionPacket)p;
-            
-            for (int i = 0; i < client.instance.Players.Count; i++)
-            {
-                client.instance.Players[i].userName = P.usernames[i];
-            }
-        }
-        //if its a hit acknowledgement we send it back after removing the correct node from unconfirmed
-        if (p is HitAck) 
-        {
-            HitAck P = (HitAck)p;
-            LinkedListNode<HitPacket> unconfirmed = client.instance.unConfirmed.First;
-            int j = client.instance.unConfirmed.Count;
-            for (int i = 0; i < j; i++)
-            {
-                if (unconfirmed.Value.id == P.id)
-                {
-
-                    unconfirmed = unconfirmed.Next;
-                    client.instance.unConfirmed.Remove(unconfirmed.Previous);
-                    //hitmarker happens here
-                    break;
-                }
-                else {
-                    unconfirmed = unconfirmed.Next; }
-            }
-            client.instance.socket.SendTo(P.toBytes(), client.server);
-
-        }
-    }
-    public void clientHandlePacket(ServerFragment s) 
-    {
-        while (s.playernum >= client.instance.Players.Count) //their playernum is higher than our max players
-        {
-            makeNewPlayerClient(s);
-        }
-        MovementPacket m = new MovementPacket(s.position,s.Rotation,s.playernum);//movement packet of the enemy
-        m.timeCreated = s.timeCreated;//make sure they are identical
-        LinkedListNode<Packet> node;
-        placeInOrder(client.instance.Players[s.playernum].PacketHistory,m, out node);
-        client.instance.Players[s.playernum].playernum = s.playernum;
-        //client.instance.Players[s.playernum].Delay = s.delay; not implemented yet
-        Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();//adjust the Enemy component
-        enemy.username = client.instance.Players[s.playernum].userName;
-        enemy.health = 100 - s.damageTaken; 
-        
-        
-    }
     public static void makeNewPlayerClient(ServerFragment s) 
     {
         print("making new player for the client");
@@ -127,68 +74,7 @@ public class PacketHandler : MonoBehaviour
         l.AddBefore(node, p);//add our packet right before the first packet that occured futher in the past
         current = node.Previous;
     }
-    public void ServerHandlePacket(Packet p,LinkedListNode<IPEndPoint> ep) 
-    {
-        if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
-        {
-            if (p is MovementPacket)//contains positional data
-            {
-                LinkedListNode<Packet> current;
-                placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);//put it in the queue where we read from to determine position
-                Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint         
-            }
-            else if (p is HitAck)
-            {
-                if (Server.instance.Resolved.Contains((HitAck)p))//stop sending a resolved hit to the user once we get it back
-                    Server.instance.Resolved.Remove((HitAck)p);
-            }
-            else if (p is HitPacket)
-            {
-                HitPacket P = (HitPacket)p;
-                bool[] hitsP = Server.instance.TestHit(P);//test hit
-
-                bool hit = false;
-                for (int i = 0; i < hitsP.Length; i++)
-                {// resolve hit here
-                    if (hitsP[i])
-                    {
-                        hit = true;
-                        Server.instance.Players[P.hits[i]].damageTaken += 20;//make this a delegate later?
-                    }
-                }
-                HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
-
-                Server.instance.Resolved.AddFirst(hitConfirmation);
-
-            }
-            else if (p is ConnectionPacket)
-            {//connect our gamer
-                bool connected = false;
-                ConnectionPacket connPacket = (ConnectionPacket)p;
-                for (int y = 0; y < Server.instance.Players.Count; y++)
-                {
-                    if (Server.instance.Players[y].EndPoint == (ep.Value))
-                    {
-                        Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
-                        connPacket.playernum = (short)y;
-                        connected = true;//gamer is already here update delay
-                    }
-                }
-                if (!connected)//if the player is not in our list of players make a new one
-                {
-                    makeNewPlayerServer(connPacket, ep);
-                }
-                connPacket.usernames = new string[Server.instance.Players.Count];//update the user list on the outgoing packet
-                for (int i = 0; i < connPacket.usernames.Length; i++)
-                {
-                    connPacket.usernames[i] = Server.instance.Players[i].userName;
-                }
-                Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value);//send back connection packet
-            }
-            
-        }
-
-    }
+   
 
 }
     
