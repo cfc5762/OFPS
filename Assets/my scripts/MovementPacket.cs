@@ -10,19 +10,19 @@ public class MovementPacket : Packet
     {
         position = t.position;
         lookrotation = t.rotation;
-        command = 0;
+        command = new byte[0];
     }
     public MovementPacket(Transform t, int num) : base(num)
     {
         position = t.position;
         lookrotation = t.rotation;
-        command = 0;
+        command = new byte[0];
     }
     public MovementPacket(Vector3 p,Quaternion r, int num) : base(num)
     {
         position = p;
         lookrotation = r;
-        command = 0;
+        command = new byte[0];
     }
     public override string id { get { return base.id + "-m"; } }
     public Vector3 position 
@@ -53,5 +53,5 @@ public class MovementPacket : Packet
     private float zRot;
     private float wRot;
     
-    public byte command;
+    public byte[] command;
 }

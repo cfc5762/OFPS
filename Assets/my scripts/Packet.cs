@@ -24,8 +24,6 @@ public class Packet
     }
     public long ticks;
     public virtual string id { get { return timeCreated.ToString() +"-"+playernum.ToString(); } }
-   
-    
     public Int16 playernum;
     public Packet() 
     {

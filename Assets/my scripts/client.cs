@@ -12,6 +12,7 @@ using UnityEngine.SocialPlatforms;
 
 public class client : MonoBehaviour
 {
+    
     public static int myPlayerNum;
     public LinkedList<HitPacket> unConfirmed;
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
@@ -26,6 +27,19 @@ public class client : MonoBehaviour
     public static string username;//needs to be set outside of this script before scene load
     public Socket socket;
     public List<Player> Players = new List<Player>();
+    public static byte commandToByte(string command) 
+    {
+        switch (command)
+        {
+            case "switchWeapon":
+                 return 1;
+            case "noShoot":
+                 return 2;
+            default:
+                return 0;
+                
+        }
+    }
     public static IPAddress GetLocalIPAddress()
     {
         if (System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
@@ -160,19 +174,19 @@ public class client : MonoBehaviour
     {
         while (playing) 
         {
-            MovementPacket movement = new MovementPacket(FpsController.transform.position,FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
+            MovementPacket movement = new MovementPacket(FpsController.transform.position, FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
             LinkedListNode<HitPacket> shot = unConfirmed.Last;
             Task.Run(() =>
             {
-                
-                    
-                    //for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
-                    //{
-                    //    socket.SendTo(shot.Value.toBytes(), server);
-                    //    if (shot.Previous == null)
-                    //        break;
-                    //    shot = shot.Previous;
-                    //}
+
+               
+                for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+                    {
+                        socket.SendTo(shot.Value.toBytes(), server);
+                        if (shot.Previous == null)
+                            break;
+                        shot = shot.Previous;
+                    }
                     socket.SendTo(movement.toBytes(), server);
                 
             });

@@ -228,6 +228,7 @@ public class Server : MonoBehaviour
         Player[] p = Players.ToArray();
         LinkedListNode<HitAck> current = Resolved.Last;
         count = Resolved.Count;
+
         Task.Run(() =>
         {
             for (int x = 0; x < p.Length; x++)
@@ -236,21 +237,29 @@ public class Server : MonoBehaviour
                 player.playernum = (short)x;
                 player.damageTaken = (short)p[x].damageTaken;
                 LinkedListNode<Packet> lastMVPK = p[x].PacketHistory.First;
-                player.delay = (short)p[x].Delay;
-                player.timeCreated = lastMVPK.Value.timeCreated;
-                player.position = ((MovementPacket)lastMVPK.Value).position;
-                player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
-                for (int y = 0; y < Players.Count; y++)
-                {//send to each player
-                    socket.SendTo(player.toBytes(), Players[y].EndPoint);
+                if (lastMVPK != null)
+                {
+                    player.delay = (short)p[x].Delay;
+                    player.timeCreated = lastMVPK.Value.timeCreated;
+                    player.position = ((MovementPacket)lastMVPK.Value).position;
+                    player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
+                    for (int y = 0; y < Players.Count; y++)
+                    {//send to each player
+
+                        socket.SendTo(player.toBytes(), Players[y].EndPoint);
+
+                    }
                 }
-            }
-            for (int i = 0; i < count; i++)
-            {
-                instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);//send resolved packet until we get acknowledgement
 
 
-                current = current.Previous;
+                for (int i = 0; i < count; i++)
+                {
+
+                    instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);//send resolved packet until we get acknowledgement
+
+
+                    current = current.Previous;
+                }
             }
         });
         
