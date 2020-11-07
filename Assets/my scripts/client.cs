@@ -74,17 +74,14 @@ public class client : MonoBehaviour
         }
         else
         {
-            
             unConfirmed = new LinkedList<HitPacket>();
             socket = new Socket(AddressFamily.InterNetwork,SocketType.Dgram, ProtocolType.Udp);
-            
             playing = true;
             instance = this;
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             StartCoroutine(ConnectionTick());
             StartCoroutine(MovementTick());
-            StartCoroutine(Recieve());
-            
+            Recieve(); 
         }
     }
     
@@ -155,8 +152,6 @@ public class client : MonoBehaviour
         Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();//adjust the Enemy component
         enemy.username = client.instance.Players[s.playernum].userName;
         enemy.health = 100 - s.damageTaken;
-
-
     }
     IEnumerator ConnectionTick() 
     {
@@ -164,16 +159,12 @@ public class client : MonoBehaviour
         {
             if (lastConnectionPacket != new ConnectionPacket())
             {
-
-
                 Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server));
             }
             else 
             {
                 EndPoint e = new IPEndPoint(GetLocalIPAddress(), 7777);
-                Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), e));
-                
-                
+                Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), e)); 
             }
             yield return new WaitForSecondsRealtime(3);
         }    
@@ -185,12 +176,9 @@ public class client : MonoBehaviour
             if (lastConnectionPacket != new ConnectionPacket())
             {
                 MovementPacket movement = new MovementPacket(FpsController.transform.position, FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
-                LinkedListNode<HitPacket> shot = unConfirmed.Last;
-                
+                LinkedListNode<HitPacket> shot = unConfirmed.Last;              
                 Task.Run(() =>
                 {
-
-
                     for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
                     {
                         socket.SendTo(shot.Value.toBytes(), server);
@@ -199,44 +187,33 @@ public class client : MonoBehaviour
                         shot = shot.Previous;
                     }
                     socket.SendTo(movement.toBytes(), server);
-
                 });
             }
-            
-            yield return new WaitForSecondsRealtime(1f / 64f);
+            yield return new WaitForSecondsRealtime(1f / 128f);
         }
     }
-    IEnumerator Recieve() //constantly listen
+    void Recieve() //constantly listen
     {
-        
-
-        socket.ReceiveTimeout = (1000/120);
+        socket.ReceiveTimeout = (1000/128);
         socket.Blocking = false;
-        
-        
-            
-            //socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
+        //socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
         byte[] b = new byte[1024];
         EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
-        while (playing)
+        Task.Run(() =>
         {
-
-            if (socket.IsBound) 
+            while (playing)
             {
-                
-                    
-                    Task.Run(() =>
+                if (socket.IsBound)
+                {
+                    while (socket.Available > 0)
                     {
-
-                        while (socket.Available > 0)
-                        {
-                            socket.ReceiveFrom(b, ref wanderingGamer);
-                            PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
-                        }
-                    });
-                 yield return new WaitForSecondsRealtime(1f / 120f);
+                        socket.ReceiveFrom(b, ref wanderingGamer);
+                        PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
+                    }
+                }
             }
-        }
+        });
+    
       
 
     }
@@ -297,8 +274,9 @@ public class client : MonoBehaviour
                     Vector3 i = (((MovementPacket)player.PacketHistory.First.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (i - 2 * n * Vector3.Dot(i, n));
-                    float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;//place the enemy players with magic
-                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(((float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, .75f));
+                    //float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;//place the enemy players with magic
+                    float timeCoeff = (float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).TotalSeconds / (float)(player.PacketHistory.First.Value.timeCreated - player.PacketHistory.First.Next.Next.Value.timeCreated).TotalSeconds;
+                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(timeCoeff, -1f, 20f));
                     player.Dummy.transform.position = playerposition;
                     print(playerposition);
                     player.Dummy.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));

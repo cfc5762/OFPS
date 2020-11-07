@@ -161,8 +161,9 @@ public class Server : MonoBehaviour
                     Vector3 n_nocross = (((MovementPacket)beforeShot.Value).position - ((MovementPacket)beforeShot.Next.Value).position);
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 nextPoint = ((MovementPacket)beforeShot.Previous.Value).position - ((MovementPacket)beforeShot.Value).position;
-                    float avgSpeed = (((MovementPacket)beforeShot.Previous.Value).position - ((MovementPacket)beforeShot.Value).position).magnitude/ (float)(((MovementPacket)beforeShot.Previous.Value).timeCreated- ((MovementPacket)beforeShot.Value).timeCreated).TotalSeconds;
-                    Vector3 playerposition = ((MovementPacket)beforeShot.Value).position + (nextPoint * Mathf.Clamp(((float)(((H.timeCreated - beforeShot.Value.timeCreated).TotalSeconds)/ (beforeShot.Previous.Value.timeCreated - beforeShot.Value.timeCreated).TotalSeconds)), 0f, .75f));
+                    //float avgSpeed = (((MovementPacket)beforeShot.Previous.Value).position - ((MovementPacket)beforeShot.Value).position).magnitude/ (float)(((MovementPacket)beforeShot.Previous.Value).timeCreated- ((MovementPacket)beforeShot.Value).timeCreated).TotalSeconds;
+                    float timeCoeff = (float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).TotalSeconds / (float)(player.PacketHistory.First.Value.timeCreated - player.PacketHistory.First.Next.Next.Value.timeCreated).TotalSeconds;
+                    Vector3 playerposition = ((MovementPacket)beforeShot.Value).position + (nextPoint * Mathf.Clamp(timeCoeff, 0f, 20f));
                     GameObject temp = Instantiate(player.Dummy);
                     temp.transform.position = playerposition;
                     temp.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
