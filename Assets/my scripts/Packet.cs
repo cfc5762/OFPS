@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using UnityEditor.Sprites;
 using UnityEngine;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -29,15 +28,11 @@ public class Packet
     {
         timeCreated = DateTime.Now;
         playernum = 1000;
-        
-
     }
     public Packet(int num)
     {
         timeCreated = DateTime.Now;
         playernum = (short)num;
-        
-
     }
    
     public static bool operator ==(Packet x, Packet y)
@@ -65,9 +60,9 @@ public class Packet
         {
             if (y is null && x is null)
             {
-                return true;
+                return false;
             }
-            return false;
+            return true;
         }
     }
     public virtual byte[] toBytes()
