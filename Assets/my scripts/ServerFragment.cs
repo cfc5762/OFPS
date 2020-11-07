@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Runtime;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -7,22 +8,49 @@ using UnityEngine;
 [Serializable]
 public class ServerFragment
 {
-    public DateTime timeCreated;
-    public int playernum;
-    public int delay;
-    public Tuple<float,float,float>_position;
-    public Vector3 position 
-    {
-        get{ return new Vector3(_position.Item1, _position.Item2, _position.Item3); }
-        set { _position = new Tuple<float, float, float>(value.x, value.y, value.z); }
+    public DateTime timeCreated {
+        get 
+        {
+            return new DateTime(ticks);
+        }
+        set 
+        {
+            ticks = value.Ticks;
+        }
     }
-    public Tuple<float, float, float, float> _lookrotation;
+    public long ticks;
+    public Int16 playernum;
+    public Int16 delay;
+    public Vector3 position
+    {
+        set
+        {
+            xPos = value.x;
+            yPos = value.y;
+            zPos = value.z;
+        }
+        get { return new Vector3(xPos, yPos, zPos); }
+    }
     public Quaternion Rotation
     {
-        get { return new Quaternion(_lookrotation.Item1, _lookrotation.Item2, _lookrotation.Item3, _lookrotation.Item4); }
-        set { _lookrotation = new Tuple<float, float, float, float>(value.x, value.y, value.z, value.w); }
+        set
+        {
+            xRot = value.x;
+            yRot = value.y;
+            zRot = value.z;
+            wRot = value.w;
+        }
+        get { return new Quaternion(xRot, yRot, zRot, wRot); }
     }
-    public int damageTaken;
+    private float xPos;
+    private float yPos;
+    private float zPos;
+    private float xRot;
+    private float yRot;
+    private float zRot;
+    private float wRot;
+
+    public Int16 damageTaken;
     public byte[] toBytes() 
     {
         BinaryFormatter b = new BinaryFormatter();

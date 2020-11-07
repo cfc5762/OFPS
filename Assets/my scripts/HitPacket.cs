@@ -12,7 +12,7 @@ public class HitPacket : MovementPacket
         hits = playernums;
         CameraLocation = camera.position;
     }
-    public HitPacket(Transform camera, Transform body, int[] playernums,int playernum,IPEndPoint ep) : base(body,playernum,ep)
+    public HitPacket(Transform camera, Transform body, int[] playernums,int playernum,IPEndPoint ep) : base(body,playernum)
     {
         normal = camera.forward;
         hits = playernums;
