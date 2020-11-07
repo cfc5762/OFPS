@@ -95,6 +95,7 @@ public class client : MonoBehaviour
     }
     public void clientHandlePacket(Packet p)
     {
+        
         //if its a connection packet log the interaction
         if (p is ConnectionPacket)
         {
@@ -110,9 +111,8 @@ public class client : MonoBehaviour
             {
                 client.instance.Players[i].userName = P.usernames[i];
             }
-        }
-        //if its a hit acknowledgement we send it back after removing the correct node from unconfirmed
-        if (p is HitAck)
+        }//if its a hit acknowledgement we send it back after removing the correct node from unconfirmed
+        else if (p is HitAck)
         {
             HitAck P = (HitAck)p;
             LinkedListNode<HitPacket> unconfirmed = client.instance.unConfirmed.First;
@@ -199,24 +199,29 @@ public class client : MonoBehaviour
         //socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
         byte[] b = new byte[1024];
         EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
+
         Task.Run(() =>
         {
             while (playing)
             {
                 if (socket.IsBound)
                 {
+
                     while (socket.Available > 0)
                     {
                         socket.ReceiveFrom(b, ref wanderingGamer);
                         PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
                     }
+
                 }
             }
         });
+    }
+        
     
       
 
-    }
+    
     private void FixedUpdate()
     {
         LinkedListNode<byte[]> buff = instance.Queue.Last;
@@ -226,12 +231,12 @@ public class client : MonoBehaviour
             BinaryFormatter b = new BinaryFormatter();
             MemoryStream m = new MemoryStream(buff.Value);
             var pack_ = b.Deserialize(m);
+            
             if (pack_ is Packet)
             {
-                
                 clientHandlePacket((Packet)pack_);
             }
-            if(pack_ is ServerFragment)
+            else if(pack_ is ServerFragment)
             {
                 
                 clientHandlePacket((ServerFragment)pack_);
@@ -278,7 +283,7 @@ public class client : MonoBehaviour
                     float timeCoeff = (float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).TotalSeconds / (float)(player.PacketHistory.First.Value.timeCreated - player.PacketHistory.First.Next.Next.Value.timeCreated).TotalSeconds;
                     Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(timeCoeff, -1f, 20f));
                     player.Dummy.transform.position = playerposition;
-                    print(playerposition);
+                    
                     player.Dummy.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
                 }
                 else if (player.PacketHistory.Count > 0)

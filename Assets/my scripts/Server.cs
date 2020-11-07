@@ -254,7 +254,8 @@ public class Server : MonoBehaviour
                     {//send to each player
                         if (y == player.playernum) 
                         {
-                            player.position = player.position * -1;
+                            player.position = new Vector3(player.position.x * -1,player.position.y,player.position.z * -1);
+                            
                         }
                         //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
                         socket.SendTo(player.toBytes(), Players[y].EndPoint);
