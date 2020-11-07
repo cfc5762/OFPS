@@ -44,6 +44,7 @@ public class PacketHandler : MonoBehaviour
     {
         Debug.Log("making "+P.username+" for the client");
         Player player = new Player();
+        player.Dummy = Instantiate(Server.instance.EnemyPrefab);
         player.EndPoint = client.server;
         player.playernum = P.playernum;
         client.instance.Players.Add(player);
@@ -80,7 +81,7 @@ public class PacketHandler : MonoBehaviour
         LinkedListNode<Packet> node = l.First;
         if (node != null)
         {
-            while (p.timeCreated >= node.Value.timeCreated)//is our current node in the packet history younger than the packet
+            while (p.timeCreated <= node.Value.timeCreated)//is our current node in the packet history younger than the packet
             {
                 if (node.Next != null)
                     node = node.Next;//move further into the past

@@ -21,8 +21,35 @@ public class ServerFragment
     public long ticks;
     public Int16 playernum;
     public Int16 delay;
-    public Quaternion Rotation;
-    public Vector3 position;
+    public Vector3 position
+    {
+        set
+        {
+            xPos = value.x;
+            yPos = value.y;
+            zPos = value.z;
+        }
+        get { return new Vector3(xPos, yPos, zPos); }
+    }
+    public Quaternion Rotation
+    {
+        set
+        {
+            xRot = value.x;
+            yRot = value.y;
+            zRot = value.z;
+            wRot = value.w;
+        }
+        get { return new Quaternion(xRot, yRot, zRot, wRot); }
+    }
+    private float xPos;
+    private float yPos;
+    private float zPos;
+    private float xRot;
+    private float yRot;
+    private float zRot;
+    private float wRot;
+
     public Int16 damageTaken;
     public byte[] toBytes() 
     {

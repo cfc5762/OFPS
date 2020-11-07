@@ -52,7 +52,7 @@ public class Server : MonoBehaviour
             ConnectionPacket connPacket = (ConnectionPacket)p;
             for (int y = 0; y < Server.instance.Players.Count; y++)
             {
-                if (Server.instance.Players[y].EndPoint.Port == (ep.Value).Port&& Server.instance.Players[y].EndPoint.Address.ToString() == (ep.Value).Address.ToString())
+                if (Server.instance.Players[y].EndPoint.Port == (ep.Value).Port && Server.instance.Players[y].EndPoint.Address.ToString() == (ep.Value).Address.ToString())
                 {
                     Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
                     connPacket.playernum = (short)y;
@@ -70,39 +70,41 @@ public class Server : MonoBehaviour
             }
             Task.Run(() => { Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value); });//send back connection packet
         }
-        else if (p.playernum!=1000&&!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
+        else if (p.playernum != 1000)
         {
-            if (p is MovementPacket)//contains positional data
+            if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
             {
-                LinkedListNode<Packet> current;
-                PacketHandler.placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);//put it in the queue where we read from to determine position
-                print(((MovementPacket)p).position);
-                Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint
-                
-            }
-            else if (p is HitAck)
-            {
-                if (Server.instance.Resolved.Contains((HitAck)p))//stop sending a resolved hit to the user once we get it back
-                    Server.instance.Resolved.Remove((HitAck)p);
-            }
-            else if (p is HitPacket)
-            {
-                HitPacket P = (HitPacket)p;
-                bool[] hitsP = Server.instance.TestHit(P);//test hit
-                bool hit = false;
-                for (int i = 0; i < hitsP.Length; i++)
-                {// resolve hit here
-                    if (hitsP[i])
-                    {
-                        hit = true;
-                        Server.instance.Players[P.hits[i]].damageTaken += 20;//make this a delegate later?
-                    }
-                }
-                HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
-                Server.instance.Resolved.AddFirst(hitConfirmation);
-            }
-            
+                if (p is MovementPacket)//contains positional data
+                {
+                    LinkedListNode<Packet> current;
+                    PacketHandler.placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);//put it in the queue where we read from to determine position
+                    Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint
 
+                }
+                else if (p is HitAck)
+                {
+                    if (Server.instance.Resolved.Contains((HitAck)p))//stop sending a resolved hit to the user once we get it back
+                        Server.instance.Resolved.Remove((HitAck)p);
+                }
+                else if (p is HitPacket)
+                {
+                    HitPacket P = (HitPacket)p;
+                    bool[] hitsP = Server.instance.TestHit(P);//test hit
+                    bool hit = false;
+                    for (int i = 0; i < hitsP.Length; i++)
+                    {// resolve hit here
+                        if (hitsP[i])
+                        {
+                            hit = true;
+                            Server.instance.Players[P.hits[i]].damageTaken += 20;//make this a delegate later?
+                        }
+                    }
+                    HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
+                    Server.instance.Resolved.AddFirst(hitConfirmation);
+                }
+
+
+            }
         }
 
     }
@@ -125,7 +127,7 @@ public class Server : MonoBehaviour
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (I - 2 * n * Vector3.Dot(I, n));
                     float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;
-                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint.normalized * avgSpeed * Mathf.Clamp(((float)(H.timeCreated - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, .75f));
+                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(((float)(H.timeCreated - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, .75f));
                     GameObject temp = Instantiate(EnemyPrefab);
                     temp.transform.position = playerposition;
                     temp.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
@@ -195,7 +197,7 @@ public class Server : MonoBehaviour
             EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
             while (recieving)
             {
-                if (socket.Available > 0)
+                while (socket.Available > 0)
                 {
                     socket.ReceiveFrom(b, ref wanderingGamer);
                     PacketHandler.instance.OffloadServer(b, (IPEndPoint)wanderingGamer);
@@ -209,8 +211,12 @@ public class Server : MonoBehaviour
         //every frame we start by clearing the buffer of all of its packets
         LinkedListNode<byte[]> buff = instance.Queue.Last;
         LinkedListNode<IPEndPoint> ep = instance.EndPoints.Last;
-        int count = instance.Queue.Count;//prevent modifying changing elements
-        for (int i = 0; i < count; i++)
+        int count = 0;
+        if(buff != null) 
+        { 
+        count = instance.Queue.Count;//prevent modifying changing elements
+        }
+        for (int i = 0; i < count-1; i++)
         {
                 BinaryFormatter b = new BinaryFormatter();
                 MemoryStream m = new MemoryStream(buff.Value);
@@ -245,7 +251,11 @@ public class Server : MonoBehaviour
                     player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
                     for (int y = 0; y < Players.Count; y++)
                     {//send to each player
-
+                        if (y == player.playernum) 
+                        {
+                            player.position = player.position * -1;
+                        }
+                        //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
                         socket.SendTo(player.toBytes(), Players[y].EndPoint);
 
                     }
