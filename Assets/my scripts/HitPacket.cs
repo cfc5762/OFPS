@@ -4,7 +4,7 @@ using System.Net;
 using TMPro;
 using UnityEngine;
 
-public class HitPacket : MovementPacket
+public class HitPacket : ConfirmPacket
 {
     public HitPacket(Transform camera, Transform body, int[] playernums) : base(body)
     {

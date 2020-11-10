@@ -44,6 +44,30 @@ public class Server : MonoBehaviour
     {
         recieving = false;
     }
+    public virtual void resolveConfirmPacket(ConfirmPacket c) 
+    {
+        if (c is HitPacket)
+        {
+            HitPacket P = (HitPacket)c;
+            HitAck hitConfirmation;
+            HitResolution(P, out hitConfirmation);
+            Server.instance.Resolved.AddFirst(hitConfirmation);
+        }
+    }
+    public virtual void HitResolution(HitPacket H,out HitAck h) 
+    {
+        bool[] hitsP = Server.instance.TestHit(H);//test hit
+        bool hit = false;
+        for (int i = 0; i < hitsP.Length; i++)
+        {// resolve hit here
+            if (hitsP[i])
+            {
+                hit = true;
+                Server.instance.Players[H.hits[i]].damageTaken += 20;//make this a delegate later?
+            }
+        }
+        h = new HitAck(H, hit);
+    }
     public void ServerHandlePacket(Packet p, LinkedListNode<IPEndPoint> ep)
     {
         if (p is ConnectionPacket)
@@ -86,21 +110,12 @@ public class Server : MonoBehaviour
                     if (Server.instance.Resolved.Contains((HitAck)p))//stop sending a resolved hit to the user once we get it back
                         Server.instance.Resolved.Remove((HitAck)p);
                 }
-                else if (p is HitPacket)
+                else if (p is ConfirmPacket)
                 {
-                    HitPacket P = (HitPacket)p;
-                    bool[] hitsP = Server.instance.TestHit(P);//test hit
-                    bool hit = false;
-                    for (int i = 0; i < hitsP.Length; i++)
-                    {// resolve hit here
-                        if (hitsP[i])
-                        {
-                            hit = true;
-                            Server.instance.Players[P.hits[i]].damageTaken += 20;//make this a delegate later?
-                        }
-                    }
-                    HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
-                    Server.instance.Resolved.AddFirst(hitConfirmation);
+                    //resolveConfirmPacket()
+                    
+                     
+                    
                 }
 
 
@@ -207,7 +222,7 @@ public class Server : MonoBehaviour
         });
 
     }
-    private void FixedUpdate()
+    public virtual void FixedUpdate()
     {
         //every frame we start by clearing the buffer of all of its packets
         LinkedListNode<byte[]> buff = instance.Queue.Last;

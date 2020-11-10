@@ -176,16 +176,20 @@ public class client : MonoBehaviour
             if (lastConnectionPacket != new ConnectionPacket())
             {
                 MovementPacket movement = new MovementPacket(FpsController.transform.position, FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
-                LinkedListNode<HitPacket> shot = unConfirmed.Last;              
-                Task.Run(() =>
-                {
-                    for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+                LinkedListNode<HitPacket> shot = unConfirmed.Last;
+
+                for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+                { 
+                    Task.Run(() =>
                     {
                         socket.SendTo(shot.Value.toBytes(), server);
-                        if (shot.Previous == null)
-                            break;
-                        shot = shot.Previous;
-                    }
+                    });
+                    if (shot.Previous == null)
+                        break;
+                    shot = shot.Previous;
+                }
+                Task.Run(() =>
+                {
                     socket.SendTo(movement.toBytes(), server);
                 });
             }
