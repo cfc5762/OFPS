@@ -152,6 +152,7 @@ public class client : MonoBehaviour
         Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();//adjust the Enemy component
         enemy.username = client.instance.Players[s.playernum].userName;
         enemy.health = 100 - s.damageTaken;
+        enemy.playernum = s.playernum;
     }
     IEnumerator ConnectionTick() 
     {
@@ -166,7 +167,7 @@ public class client : MonoBehaviour
                 EndPoint e = new IPEndPoint(GetLocalIPAddress(), 7777);
                 Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), e)); 
             }
-            yield return new WaitForSecondsRealtime(3);
+            yield return new WaitForSecondsRealtime(1);
         }    
     }
     IEnumerator MovementTick()
@@ -229,9 +230,14 @@ public class client : MonoBehaviour
     private void FixedUpdate()
     {
         LinkedListNode<byte[]> buff = instance.Queue.Last;
-        int count = instance.Queue.Count;//prevent modifying changing elements
+        int count = 0;
+        if (buff != null)
+        {
+            count = instance.Queue.Count;//prevent modifying changing elements
+        }
         for (int i = 0; i < count; i++)
         {
+            
             BinaryFormatter b = new BinaryFormatter();
             MemoryStream m = new MemoryStream(buff.Value);
             var pack_ = b.Deserialize(m);
@@ -273,7 +279,7 @@ public class client : MonoBehaviour
     {
         foreach (Player player in Players.ToArray())
         {
-            if (true)//(player.playernum != lastConnectionPacket.playernum)
+            if (player.playernum != lastConnectionPacket.playernum)//(player.playernum != lastConnectionPacket.playernum)
             {
                 if (player.PacketHistory.Count > 2)
                 {

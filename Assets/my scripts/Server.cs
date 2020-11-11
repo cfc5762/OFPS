@@ -84,8 +84,8 @@ public class Server : MonoBehaviour
             {
                 PacketHandler.makeNewPlayerServer(connPacket, ep);
             }
-            connPacket.usernames = new string[Server.instance.Players.Count];//update the user list on the outgoing packet
-            for (int i = 0; i < connPacket.usernames.Length; i++)
+            connPacket.usernames = new string[12];//update the user list on the outgoing packet
+            for (int i = 0; i < Server.instance.Players.Count; i++)
             {
                 connPacket.usernames[i] = Server.instance.Players[i].userName;
             }
@@ -267,6 +267,7 @@ public class Server : MonoBehaviour
                         if (y == player.playernum) 
                         {
                             player.position = new Vector3(player.position.x * -1,player.position.y,player.position.z * -1);
+                            player.playernum = (short)(player.playernum + 1);
                             
                         }
                         //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);

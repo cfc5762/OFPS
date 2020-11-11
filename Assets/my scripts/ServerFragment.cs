@@ -49,7 +49,7 @@ public class ServerFragment
     private float yRot;
     private float zRot;
     private float wRot;
-
+    byte[] commands;
     public Int16 damageTaken;
     public byte[] toBytes() 
     {

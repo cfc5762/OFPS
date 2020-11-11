@@ -44,9 +44,12 @@ public class PacketHandler : MonoBehaviour
     {
         Debug.Log("making "+P.username+" for the client");
         Player player = new Player();
-        player.Dummy = Instantiate(Server.instance.EnemyPrefab);
-        player.EndPoint = client.server;
-        player.playernum = P.playernum;
+        if (client.myPlayerNum != P.playernum)
+        {
+            player.Dummy = Instantiate(Server.instance.EnemyPrefab);
+            player.EndPoint = client.server;
+            player.playernum = P.playernum;
+        }
         client.instance.Players.Add(player);
     }
     public static void makeNewPlayerClient(ServerFragment s) 
