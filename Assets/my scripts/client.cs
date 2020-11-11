@@ -284,8 +284,21 @@ public class client : MonoBehaviour
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (i - 2 * n * Vector3.Dot(i, n));
                     //float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;//place the enemy players with magic
-                    float timeCoeff = (float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).TotalSeconds / (float)(player.PacketHistory.First.Value.timeCreated - player.PacketHistory.First.Next.Next.Value.timeCreated).TotalSeconds;
-                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(timeCoeff, -1f, 20f));
+                    float timeCoeff = (float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).Milliseconds/1000f;
+                    float speed = n_nocross.sqrMagnitude / j.magnitude;
+                    if (timeCoeff > 2f) 
+                    {
+                        timeCoeff = 0;
+                    }
+                    if (float.IsNaN(speed)) 
+                    {
+                        speed = 0;
+                    }
+                    if (speed > 500) 
+                    {
+                        speed = 0;
+                    }
+                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint.normalized * speed * timeCoeff);
                     player.Dummy.transform.position = playerposition;
                     
                     player.Dummy.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
