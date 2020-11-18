@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -7,21 +7,19 @@ using System.Net.Sockets;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEditorInternal;
 using UnityEngine;
 //use push front for player packets to order for positional netcode
 public class Server : MonoBehaviour
 {
-    
     static bool recieving = false;
     public Socket socket;
     public GameObject EnemyPrefab;//set in scene
     public List<Player> Players = new List<Player>();
     public LinkedList<IPEndPoint> EndPoints = new LinkedList<IPEndPoint>();
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
-    BinaryFormatter b = new BinaryFormatter();
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
-    public LinkedList<HitAck> Confirmed = new LinkedList<HitAck>();
-    public Thread recv;
+    public LinkedList<HitAck> Unresolved = new LinkedList<HitAck>();
     public static Server instance;
     // Start is called before the first frame update
     void Awake()//set the server singleton
@@ -32,18 +30,9 @@ public class Server : MonoBehaviour
         }
         else
         {
-            if (client.toSendQueue == null) //make sure we have a send queue
-            {
-                client.toSendQueue = new LinkedList<Tuple<Socket, byte[], EndPoint>>();
-            }
             instance = this;
-           //DontDestroyOnLoad(gameObject);
-            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            socket.Bind(new IPEndPoint(IPAddress.Any, 28960));//listen on any address on this port
-
             recieving = true;
-            recv = new Thread(()=> { Recieve(socket); });
-            recv.Start();
+            Recieve();    
         }
         
     }
@@ -54,6 +43,70 @@ public class Server : MonoBehaviour
     private void OnApplicationQuit()
     {
         recieving = false;
+    }
+    public void ServerHandlePacket(Packet p, LinkedListNode<IPEndPoint> ep)
+    {
+        if (p is ConnectionPacket)
+        {//connect our gamer
+            bool connected = false;
+            ConnectionPacket connPacket = (ConnectionPacket)p;
+            for (int y = 0; y < Server.instance.Players.Count; y++)
+            {
+                if (Server.instance.Players[y].EndPoint.Port == (ep.Value).Port && Server.instance.Players[y].EndPoint.Address.ToString() == (ep.Value).Address.ToString())
+                {
+                    Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
+                    connPacket.playernum = (short)y;
+                    connected = true;//gamer is already here update delay
+                }
+            }
+            if (!connected)//if the player is not in our list of players make a new one
+            {
+                PacketHandler.makeNewPlayerServer(connPacket, ep);
+            }
+            connPacket.usernames = new string[Server.instance.Players.Count];//update the user list on the outgoing packet
+            for (int i = 0; i < connPacket.usernames.Length; i++)
+            {
+                connPacket.usernames[i] = Server.instance.Players[i].userName;
+            }
+            Task.Run(() => { Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value); });//send back connection packet
+        }
+        else if (p.playernum != 1000)
+        {
+            if (!Server.instance.Players[p.playernum].PacketHistory.Contains(p))
+            {
+                if (p is MovementPacket)//contains positional data
+                {
+                    LinkedListNode<Packet> current;
+                    PacketHandler.placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);//put it in the queue where we read from to determine position
+                    Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint
+
+                }
+                else if (p is HitAck)
+                {
+                    if (Server.instance.Resolved.Contains((HitAck)p))//stop sending a resolved hit to the user once we get it back
+                        Server.instance.Resolved.Remove((HitAck)p);
+                }
+                else if (p is HitPacket)
+                {
+                    HitPacket P = (HitPacket)p;
+                    bool[] hitsP = Server.instance.TestHit(P);//test hit
+                    bool hit = false;
+                    for (int i = 0; i < hitsP.Length; i++)
+                    {// resolve hit here
+                        if (hitsP[i])
+                        {
+                            hit = true;
+                            Server.instance.Players[P.hits[i]].damageTaken += 20;//make this a delegate later?
+                        }
+                    }
+                    HitAck hitConfirmation = new HitAck(P, hit);//create a hit confirmation and put it on the stack
+                    Server.instance.Resolved.AddFirst(hitConfirmation);
+                }
+
+
+            }
+        }
+
     }
     public bool[] TestHit(HitPacket H)//returns an array of which enemies we hit with a given hitpacket
     {
@@ -74,11 +127,11 @@ public class Server : MonoBehaviour
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (I - 2 * n * Vector3.Dot(I, n));
                     float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;
-                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint.normalized * avgSpeed * Mathf.Clamp(((float)(H.timeCreated - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, .75f));
+                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(((float)(H.timeCreated - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, .75f));
                     GameObject temp = Instantiate(EnemyPrefab);
                     temp.transform.position = playerposition;
                     temp.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
-                    if (Physics.Raycast(H.CameraLocation, H.normal)&&Players[H.playernum].damageTaken<100)
+                    if (Physics.Raycast(H.CameraLocation, H.normal)&&Players[H.playernum].damageTaken<100)//needs work
                     {
                         Confirms[i] = true;
                     }
@@ -96,7 +149,7 @@ public class Server : MonoBehaviour
             else //otherwise we interpolate between the two points based on current time
             {
                 LinkedListNode<Packet> beforeShot = Players[H.hits[i]].PacketHistory.First;
-                while (beforeShot.Value.timeCreated>H.timeCreated&&beforeShot.Next.Next!=null)
+                while (beforeShot.Value.timeCreated >= H.timeCreated&&beforeShot.Next.Next!=null)
                 {
                     beforeShot = beforeShot.Next;
 
@@ -106,12 +159,11 @@ public class Server : MonoBehaviour
                     // same graph except this time we do not need to predict https://gyazo.com/f242ed66b95169f5cf85347ccee5f671
                     Player player = Players[H.hits[i]];
                     Vector3 n_nocross = (((MovementPacket)beforeShot.Value).position - ((MovementPacket)beforeShot.Next.Value).position);
-                    Vector3 n = Vector3.Cross(n_nocross, Vector3.up);
-                    Vector3 I = (((MovementPacket)beforeShot.Value).position - ((MovementPacket)beforeShot.Next.Next.Value).position);
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
-                    Vector3 PredictionPoint = ((MovementPacket)beforeShot.Previous.Value).position - ((MovementPacket)beforeShot.Value).position;
-                    float avgSpeed = ((n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)beforeShot.Value).timeCreated - ((MovementPacket)beforeShot.Next.Next.Value).timeCreated).TotalSeconds);
-                    Vector3 playerposition = ((MovementPacket)beforeShot.Value).position + (PredictionPoint * Mathf.Clamp(((float)(((H.timeCreated - beforeShot.Value.timeCreated).TotalSeconds)/ (beforeShot.Previous.Value.timeCreated - beforeShot.Value.timeCreated).TotalSeconds)), 0f, 1f));
+                    Vector3 nextPoint = ((MovementPacket)beforeShot.Previous.Value).position - ((MovementPacket)beforeShot.Value).position;
+                    //float avgSpeed = (((MovementPacket)beforeShot.Previous.Value).position - ((MovementPacket)beforeShot.Value).position).magnitude/ (float)(((MovementPacket)beforeShot.Previous.Value).timeCreated- ((MovementPacket)beforeShot.Value).timeCreated).TotalSeconds;
+                    float timeCoeff = (float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).TotalSeconds / (float)(player.PacketHistory.First.Value.timeCreated - player.PacketHistory.First.Next.Next.Value.timeCreated).TotalSeconds;
+                    Vector3 playerposition = ((MovementPacket)beforeShot.Value).position + (nextPoint * Mathf.Clamp(timeCoeff, 0f, 20f));
                     GameObject temp = Instantiate(player.Dummy);
                     temp.transform.position = playerposition;
                     temp.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
@@ -133,122 +185,94 @@ public class Server : MonoBehaviour
         }
         return Confirms;
     }
-    static void Recieve(Socket Forwarded) //constantly listen
+    void Recieve() //constantly listen
     {
-        while (recieving)
+        socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+       
+        socket.ReceiveTimeout = (1000);
+        socket.Blocking = false;
+        Task.Run(() =>
         {
-            byte[] b = new byte[2048];
-            EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-            Forwarded.ReceiveFrom(b, ref sender);
-            PacketHandler.instance.Offload(b, (IPEndPoint)sender);
-        }  
-    }
-    IEnumerator distributeFragments() 
-    {
-        for (int x = 0; x < Players.Count; x++)
-        {
-            if (Players[x].PacketHistory.First != null)
+            socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
+            byte[] b = new byte[1024];
+            EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
+            while (recieving)
             {
-                //make a fraghment for each player
-                ServerFragment player = new ServerFragment();
-                player.playernum = x;
-                player.damageTaken = Players[x].damageTaken;
-                Packet lastMVPK = Players[x].PacketHistory.First.Value;
-                player.delay = (int)Players[x].Delay;
-                player.timeCreated = lastMVPK.timeCreated;
-                player.position = ((MovementPacket)lastMVPK).position;
-                player.Rotation = ((MovementPacket)lastMVPK).lookrotation;
-               
-                for (int y = 0; y < Players.Count; y++)
-                {//send to each player
-                 //Console.WriteLine()
-                    if (x == y)
-                    {
-                        client.toSendQueue.AddFirst(client.getNode(socket, player.toBytes(), Players[y].EndPoint));
-                    }
-                    // instance.socket.SendTo(player.toBytes(), Players[y].EndPoint);
+                while (socket.Available > 0)
+                {
+                    socket.ReceiveFrom(b, ref wanderingGamer);
+                    PacketHandler.instance.OffloadServer(b, (IPEndPoint)wanderingGamer);
                 }
             }
-            yield return new WaitForSecondsRealtime(.01f);
-            
-        }
-    }
-    void SendTo(Socket sock, byte[] b, EndPoint ep)
-    {
-        Thread d = new Thread(() => { sock.SendTo(b, ep); });
+        });
+
     }
     private void FixedUpdate()
     {
-        
         //every frame we start by clearing the buffer of all of its packets
         LinkedListNode<byte[]> buff = instance.Queue.Last;
         LinkedListNode<IPEndPoint> ep = instance.EndPoints.Last;
-        for (int i = 0; i < instance.Queue.Count; i++)
+        int count = 0;
+        if(buff != null) 
+        { 
+        count = instance.Queue.Count;//prevent modifying changing elements
+        }
+        for (int i = 0; i < count-1; i++)
         {
-            
-           
-           
-               
+                BinaryFormatter b = new BinaryFormatter();
                 MemoryStream m = new MemoryStream(buff.Value);
                 var pack_ = b.Deserialize(m);
-                
-                
                 if (pack_ is Packet) 
                 {
-                    PacketHandler.instance.ServerHandlePacket((Packet)pack_, ep);
+                    ServerHandlePacket((Packet)pack_, ep);
                 }
-            //integrate the buffer and endpoint down the queue
-            if (buff.Previous == null || ep.Previous == null)
-            {
-                break;
-            }
-            buff = buff.Previous;
-            ep = ep.Previous;
-            instance.Queue.RemoveLast();
-            instance.EndPoints.RemoveLast();
-            
-            
-            
-            
+                //integrate the buffer and endpoint down the queue
+                buff = buff.Previous;
+                ep = ep.Previous;
+                instance.Queue.RemoveLast();
+                instance.EndPoints.RemoveLast();
         }
-        //print(instance.Queue.Count);
-        StartCoroutine(distributeFragments());
-       
-        
+        Player[] p = Players.ToArray();
         LinkedListNode<HitAck> current = Resolved.Last;
-        for (int i = 0; i < Resolved.Count; i++)
+        count = Resolved.Count;
+
+        Task.Run(() =>
         {
-            instance.socket.SendTo(current.Value.toBytes(), instance.Players[current.Value.playernum].EndPoint);
-            LinkedListNode<HitAck> placeBefore = Confirmed.First;
-            for (int j = 0; j < Confirmed.Count; j++)
-            {
-                if (current.Value.timeCreated >= placeBefore.Value.timeCreated && current.Value != placeBefore.Value)//happened after placebefore (most recent at front)
+            for (int x = 0; x < p.Length; x++)
+            {//make a fraghment for each player
+                ServerFragment player = new ServerFragment();
+                player.playernum = (short)x;
+                player.damageTaken = (short)p[x].damageTaken;
+                LinkedListNode<Packet> lastMVPK = p[x].PacketHistory.First;
+                if (lastMVPK != null)
                 {
-                    Confirmed.AddBefore(placeBefore, current.Value);
-                    break;
+                    player.delay = (short)p[x].Delay;
+                    player.timeCreated = lastMVPK.Value.timeCreated;
+                    player.position = ((MovementPacket)lastMVPK.Value).position;
+                    player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
+                    for (int y = 0; y < Players.Count; y++)
+                    {//send to each player
+                        if (y == player.playernum) 
+                        {
+                            player.position = player.position * -1;
+                        }
+                        //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
+                        socket.SendTo(player.toBytes(), Players[y].EndPoint);
+
+                    }
                 }
-                else if (current.Value == placeBefore.Value) 
-                {//we have a copy
-                    break;
-                }
-                else if (placeBefore.Next == null)//its from the super past?
+
+
+                for (int i = 0; i < count; i++)
                 {
-                    Confirmed.AddAfter(placeBefore, current.Value);
-                    break;
+
+                    instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);//send resolved packet until we get acknowledgement
+
+
+                    current = current.Previous;
                 }
-                else 
-                {//iterate here
-                    placeBefore = placeBefore.Next;
-                } 
             }
-            
-            current = current.Previous;
-        }
-        if (Confirmed.Count >= 100) 
-        {
-            Confirmed.RemoveLast();
-        }
-        
+        });
         
     }
     private void Start()
