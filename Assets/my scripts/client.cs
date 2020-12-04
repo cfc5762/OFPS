@@ -147,7 +147,7 @@ public class client : MonoBehaviour
         MovementPacket m = new MovementPacket(s.position, s.Rotation, s.playernum);//movement packet of the enemy
         m.timeCreated = s.timeCreated;//make sure they are identical
         LinkedListNode<Packet> node;
-        PacketHandler.placeInOrder(client.instance.Players[s.playernum].PacketHistory, m, out node);
+        PacketHandler.placeInOrderUnique(client.instance.Players[s.playernum].PacketHistory, m, out node);
         client.instance.Players[s.playernum].playernum = s.playernum;
         Enemy enemy = client.instance.Players[s.playernum].Dummy.GetComponent<Enemy>();//adjust the Enemy component
         enemy.username = client.instance.Players[s.playernum].userName;
@@ -176,25 +176,25 @@ public class client : MonoBehaviour
         {
             if (lastConnectionPacket != new ConnectionPacket())
             {
-                MovementPacket movement = new MovementPacket(FpsController.transform.position, FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
+                
+                    MovementPacket movement = new MovementPacket(FpsController.transform.position, FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
                 LinkedListNode<HitPacket> shot = unConfirmed.Last;
-
-                for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
+                Task.Run(() =>
+                {
+                    for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
                 { 
-                    Task.Run(() =>
-                    {
+                   
                         socket.SendTo(shot.Value.toBytes(), server);
-                    });
+                   
                     if (shot.Previous == null)
                         break;
                     shot = shot.Previous;
                 }
-                Task.Run(() =>
-                {
+                
                     socket.SendTo(movement.toBytes(), server);
                 });
-            }
-            yield return new WaitForSecondsRealtime(1f / 128f);
+            }    
+            yield return new WaitForFixedUpdate();
         }
     }
     void Recieve() //constantly listen
@@ -290,21 +290,24 @@ public class client : MonoBehaviour
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (i - 2 * n * Vector3.Dot(i, n));
                     //float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;//place the enemy players with magic
-                    float timeCoeff = (float)((DateTime.Now) - player.PacketHistory.First.Value.timeCreated).Milliseconds/1000f;
                     float speed = n_nocross.sqrMagnitude / j.magnitude;
-                    if (timeCoeff > 2f) 
+                    
+                    float timeCoeff = (float)((DateTime.Now - player.PacketHistory.First.Value.timeCreated).TotalMilliseconds / (player.PacketHistory.First.Next.Value.timeCreated - player.PacketHistory.First.Next.Next.Value.timeCreated).TotalMilliseconds);
+                    //print(((float)(DateTime.Now).Millisecond) - (player.PacketHistory.First.Value.timeCreated.Millisecond) + " " + ((player.PacketHistory.First.Value.timeCreated.Millisecond) - (player.PacketHistory.First.Next.Next.Value.timeCreated.Millisecond)));
+                    
+                    if (j.magnitude == 0) 
                     {
-                        timeCoeff = 0;
+                        speed = n_nocross.magnitude;
                     }
-                    if (float.IsNaN(speed)) 
-                    {
-                        speed = 0;
-                    }
-                    if (speed > 500) 
-                    {
-                        speed = 0;
-                    }
-                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint.normalized * speed * timeCoeff);
+                    speed = Mathf.Clamp(speed, 0, 100);
+                    timeCoeff = Mathf.Clamp(timeCoeff,0f,1f);
+                    Debug.DrawLine(((MovementPacket)player.PacketHistory.First.Value).position, ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint));
+                    Vector3 playerposition;
+                    if (speed<PredictionPoint.magnitude*1.2f)
+                        playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + ((PredictionPoint.normalized*speed)+(timeCoeff * PredictionPoint))*.5f;
+                    else
+                        playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * timeCoeff);
+
                     player.Dummy.transform.position = playerposition;
                     
                     player.Dummy.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
@@ -318,5 +321,7 @@ public class client : MonoBehaviour
             }
         }
     }
-    
+   
+
+
 }

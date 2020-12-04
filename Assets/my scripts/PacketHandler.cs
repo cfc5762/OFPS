@@ -6,7 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using UnityEngine;
-using UnityStandardAssets.SceneUtils;
+
 
 public class PacketHandler : MonoBehaviour
 {
@@ -76,7 +76,55 @@ public class PacketHandler : MonoBehaviour
         P.playernum = (short)Server.instance.Players.Count;
         Server.instance.Players.Add(Gamer);
     }
-   
+    public static void placeInOrderUnique(LinkedList<Packet> l, Packet p, out LinkedListNode<Packet> current)
+    {
+        bool addBefore = true;
+        current = null;
+        LinkedListNode<Packet> node = l.First;
+        if (node != null)
+        {
+            while (p.timeCreated <= node.Value.timeCreated)//is our current node in the packet history younger than the packet
+            {
+                if (node.Next != null)
+                    node = node.Next;//move further into the past
+                else
+                {
+                    addBefore = false;
+                    break;
+                }
+            }
+            if (addBefore)
+            {
+                if (node.Previous == null)
+                {
+
+                    l.AddBefore(node, p);//add our packet right before the first packet that occured futher in the past
+                    current = node.Previous;
+                }
+                else if (node.Previous.Value.timeCreated.Ticks != p.timeCreated.Ticks)
+                {
+                    l.AddBefore(node, p);//add our packet right before the first packet that occured futher in the past
+                    current = node.Previous;
+                }
+                else 
+                {
+                //print("trash")
+                }
+            }
+            else
+            {
+                current = node;
+                l.AddAfter(node, p);
+            }
+        }
+        else
+        {
+            l.AddFirst(p);
+        }
+
+
+    }
+
     public static void placeInOrder(LinkedList<Packet> l, Packet p, out LinkedListNode<Packet> current) 
     {
         bool addBefore = true;

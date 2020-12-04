@@ -8,8 +8,9 @@ using UnityEngine;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization.Formatters.Binary;
 [Serializable]
-public class Packet
+public class Packet : IDisposable
 {
+    
     public DateTime timeCreated
     {
         get
@@ -97,4 +98,27 @@ public class Packet
         packet = null;
         return false;
     }
+
+    public bool disposed = false;
+
+    protected virtual void Dispose(bool _disposing)
+    {
+        if (!disposed)
+        {
+            if (_disposing)
+            {
+                ticks = 0;
+                playernum = 0;
+            }
+
+            disposed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
 }
+

@@ -54,4 +54,31 @@ public class MovementPacket : Packet
     private float wRot;
     
     public byte[] command;
+    protected virtual void Dispose(bool _disposing)
+    {
+        if (!disposed)
+        {
+            if (_disposing)
+            {
+                ticks = 0;
+                playernum = 0;
+                xPos=0;
+                yPos=0;
+                zPos=0;
+                xRot=0;
+                yRot=0;
+                zRot=0;
+                wRot = 0;
+            }
+
+            disposed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        base.Dispose(true);
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
 }

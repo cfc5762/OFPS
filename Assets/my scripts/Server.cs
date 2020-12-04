@@ -139,7 +139,7 @@ public class Server : MonoBehaviour
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (I - 2 * n * Vector3.Dot(I, n));
                     float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;
-                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(((float)(H.timeCreated - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, .75f));
+                    Vector3 playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * Mathf.Clamp(((float)(H.timeCreated - player.PacketHistory.First.Value.timeCreated).TotalSeconds), -1, 10f));
                     GameObject temp = Instantiate(EnemyPrefab);
                     temp.transform.position = playerposition;
                     temp.transform.rotation = ((MovementPacket)player.PacketHistory.First.Value).lookrotation * Quaternion.Euler((((MovementPacket)player.PacketHistory.First.Next.Value).lookrotation.eulerAngles - ((MovementPacket)player.PacketHistory.First.Value).lookrotation.eulerAngles));
@@ -248,8 +248,7 @@ public class Server : MonoBehaviour
         LinkedListNode<HitAck> current = Resolved.Last;
         count = Resolved.Count;
 
-        Task.Run(() =>
-        {
+        
             for (int x = 0; x < p.Length; x++)
             {//make a fraghment for each player
                 ServerFragment player = new ServerFragment();
@@ -262,6 +261,7 @@ public class Server : MonoBehaviour
                     player.timeCreated = lastMVPK.Value.timeCreated;
                     player.position = ((MovementPacket)lastMVPK.Value).position;
                     player.Rotation = ((MovementPacket)lastMVPK.Value).lookrotation;
+                    player.timeCreated = lastMVPK.Value.timeCreated;
                     for (int y = 0; y < Players.Count; y++)
                     {//send to each player
                         if (y == player.playernum) 
@@ -270,23 +270,27 @@ public class Server : MonoBehaviour
                             player.playernum = (short)(player.playernum + 1);
                             
                         }
-                        //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
+                    //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
+                    Task.Run(() =>
+                    {
                         socket.SendTo(player.toBytes(), Players[y].EndPoint);
-
-                    }
+                    });
+                }
                 }
 
 
                 for (int i = 0; i < count; i++)
                 {
 
+                Task.Run(() =>
+                {
                     instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);//send resolved packet until we get acknowledgement
+                });
 
-
-                    current = current.Previous;
+                current = current.Previous;
                 }
             }
-        });
+        
         
     }
     private void Start()

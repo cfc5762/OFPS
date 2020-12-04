@@ -105,6 +105,18 @@ public class PlayerInput : MonoBehaviour
 
     void Update()
     {
+        
+    }
+
+    public void FixedUpdate()
+    {
+        if (!Input.GetKey(KeyCode.Space))
+        {
+            jump = false;
+            jumpTimer++;
+        }
+        else if (jumpTimer > 0)
+            jump = true;
         _down = Vector2.zero;
         if (raw.x != previous.x)
         {
@@ -118,17 +130,6 @@ public class PlayerInput : MonoBehaviour
             if (previous.y != 0)
                 _down.y = previous.y;
         }
-    }
-
-    public void FixedUpdate()
-    {
-        if (!Input.GetKey(KeyCode.Space))
-        {
-            jump = false;
-            jumpTimer++;
-        }
-        else if (jumpTimer > 0)
-            jump = true;
     }
 
     public bool Jump()
