@@ -6,11 +6,34 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using UnityEngine;
-
+using Steamworks;
 
 public class PacketHandler : MonoBehaviour
 {
-    
+    public static byte[] fromClient(byte[] b)
+    {
+        List<byte> b2 = b.ToList<byte>();
+        b2.RemoveAt(0);
+        return b2.ToArray();
+    }
+    public static byte[] fromServer(byte[] b)
+    {
+        List<byte> b2 = b.ToList<byte>();
+        b2.RemoveAt(0);
+        return b2.ToArray();
+    }
+    public static byte[] toClient(byte[] b)
+    {
+        List<byte> b2 = b.ToList<byte>();
+        b2.Insert(0, 200);
+        return b2.ToArray();
+    }
+    public static byte[] toServer(byte[] b)
+    {
+        List<byte> b2 = b.ToList<byte>();
+        b2.Insert(0, 100);
+        return b2.ToArray();
+    }
     //make a list for ur packets
     public static PacketHandler instance;
     // Start is called before the first frame update
@@ -25,19 +48,20 @@ public class PacketHandler : MonoBehaviour
             instance = this;
         }
     }
-    public void OffloadClient(byte[] P, IPEndPoint e) 
+    public void OffloadClient(byte[] P, CSteamID e)
     {
         if (P != null && e != null)
         {
-            if (e.Address.ToString() == client.server.Address.ToString()&&e.Port==client.server.Port)
+            if (e == client.server)
             {//if we got it from the server offload 
                 client.instance.Queue.AddFirst(P);
             }
+            
         }
     }
-    public void OffloadServer(byte[] P,IPEndPoint e)
-    {//offload with endpoints to the queue to be processed
-        Server.instance.EndPoints.AddFirst((IPEndPoint)e);
+    public void OffloadServer(byte[] P, CSteamID e)
+    {
+        Server.instance.SteamIDs.AddFirst(e);
         Server.instance.Queue.AddFirst(P);
     }
     public static void makeNewPlayerClient(ConnectionPacket P)
@@ -47,7 +71,7 @@ public class PacketHandler : MonoBehaviour
         if (client.myPlayerNum != P.playernum)
         {
             player.Dummy = Instantiate(Server.instance.EnemyPrefab);
-            player.EndPoint = client.server;
+            player.SteamID = client.server;
             player.playernum = P.playernum;
         }
         client.instance.Players.Add(player);
@@ -56,19 +80,19 @@ public class PacketHandler : MonoBehaviour
     {
         Debug.Log("making new player for the client");
         Player player = new Player();
-        player.EndPoint = client.server;
+        player.SteamID = client.server;
         player.playernum = client.instance.Players.Count;
         player.Dummy = Instantiate(client.instance.EnemyPrefab);
         player.Dummy.transform.position = new Vector3(0, 1000, 0);
         player.playernum = s.playernum;
         client.instance.Players.Add(player);
     }
-    public static void makeNewPlayerServer(ConnectionPacket P , LinkedListNode<IPEndPoint> ep) 
+    public static void makeNewPlayerServer(ConnectionPacket P , LinkedListNode<CSteamID> ep) 
     {
         Player Gamer = new Player();
         Gamer.Delay = 2f * (float)(DateTime.Now - P.timeCreated).TotalMilliseconds;
         Gamer.damageTaken = 0;
-        Gamer.EndPoint = ep.Value;
+        Gamer.SteamID = ep.Value;
         Gamer.Dummy = Server.instance.EnemyPrefab;//initialize new player
         Gamer.PacketHistory = new LinkedList<Packet>();
         Gamer.userName = P.username;

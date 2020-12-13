@@ -9,6 +9,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
+using Steamworks;
 
 public class client : MonoBehaviour
 {
@@ -23,7 +24,7 @@ public class client : MonoBehaviour
     public ConnectionPacket lastConnectionPacket;//all statics except for instance are to be set outside the script
     public static client instance;
     public IPEndPoint localEp;
-    public static IPEndPoint server;//needs to be set outside of this script before scene load
+    public static CSteamID server;//needs to be set outside of this script before scene load
     public static string username;//needs to be set outside of this script before scene load
     public Socket socket;
     public List<Player> Players = new List<Player>();
@@ -39,7 +40,12 @@ public class client : MonoBehaviour
                 return 3;
             case "reload":
                 return 4;
-            
+            case "aim_in":
+                return 5;
+            case "aim_out":
+                return 6;
+            case "change_gear":
+                return 7;
             default:
                 return 0;
                 
@@ -65,8 +71,15 @@ public class client : MonoBehaviour
     void Awake()
     {
         lastConnectionPacket = new ConnectionPacket();
-        username = "silktail";
-        server = new IPEndPoint(GetLocalIPAddress(), 7777);
+        SteamAPI.Init();
+        if (SteamManager.Initialized)
+        {
+            string name = SteamFriends.GetPersonaName();
+            username = name;
+            Debug.Log(name);
+        }
+        
+        server = SteamUser.GetSteamID();
         
         if (instance != null && instance != this)
         {
@@ -81,7 +94,7 @@ public class client : MonoBehaviour
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             StartCoroutine(ConnectionTick());
             StartCoroutine(MovementTick());
-            Recieve(); 
+            
         }
     }
     
@@ -95,22 +108,24 @@ public class client : MonoBehaviour
     }
     public void clientHandlePacket(Packet p)
     {
-        
-        //if its a connection packet log the interaction
-        if (p is ConnectionPacket)
+        if (p is MovementPacket)
         {
-            ConnectionPacket P = (ConnectionPacket)p;
-            if (lastConnectionPacket == new ConnectionPacket()) 
+
+        }
+        //if its a connection packet log the interaction
+        else if (p is ConnectionPacket)
+        {
+            print("client got connection packet");
+            using (ConnectionPacket P = (ConnectionPacket)p)
             {
-                PacketHandler.makeNewPlayerClient(P);
+                if (p.playernum != myPlayerNum && Players.Count == p.playernum)
+                {
+                    PacketHandler.makeNewPlayerClient(P);
+                }
+                lastConnectionPacket = P;
+                myPlayerNum = P.playernum;
             }
-            lastConnectionPacket = P;
-            myPlayerNum = P.playernum;
-            
-            for (int i = 0; i < client.instance.Players.Count; i++)
-            {
-                client.instance.Players[i].userName = P.usernames[i];
-            }
+           
         }//if its a hit acknowledgement we send it back after removing the correct node from unconfirmed
         else if (p is HitAck)
         {
@@ -132,10 +147,8 @@ public class client : MonoBehaviour
                     unconfirmed = unconfirmed.Next;
                 }
             }
-            Task.Run(() =>
-            {
-                client.instance.socket.SendTo(P.toBytes(), client.server);
-            });
+            SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(P.toBytes()), (uint)PacketHandler.toServer(P.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+            
         }
     }
     public void clientHandlePacket(ServerFragment s)
@@ -160,12 +173,15 @@ public class client : MonoBehaviour
         {
             if (lastConnectionPacket != new ConnectionPacket())
             {
-                Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), server));
+                
+                SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()), (uint)PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
             }
             else 
             {
-                EndPoint e = new IPEndPoint(GetLocalIPAddress(), 7777);
-                Task.Run(() => socket.SendTo((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes(), e)); 
+                CSteamID myId = SteamUser.GetSteamID();
+                
+                SteamNetworking.SendP2PPacket(myId, PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()), (uint)PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+
             }
             yield return new WaitForSecondsRealtime(1);
         }    
@@ -176,52 +192,27 @@ public class client : MonoBehaviour
         {
             if (lastConnectionPacket != new ConnectionPacket())
             {
-                
+              
                     MovementPacket movement = new MovementPacket(FpsController.transform.position, FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
-                LinkedListNode<HitPacket> shot = unConfirmed.Last;
-                Task.Run(() =>
-                {
+                    LinkedListNode<HitPacket> shot = unConfirmed.Last;
+
                     for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
-                { 
-                   
-                        socket.SendTo(shot.Value.toBytes(), server);
-                   
-                    if (shot.Previous == null)
-                        break;
-                    shot = shot.Previous;
-                }
+                    {
+                        SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(shot.Value.toBytes()), (uint)PacketHandler.toServer(shot.Value.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+
+
+                        if (shot.Previous == null)
+                            break;
+                        shot = shot.Previous;
+                    }
+                    SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(movement.toBytes()), (uint)PacketHandler.toServer(movement.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
                 
-                    socket.SendTo(movement.toBytes(), server);
-                });
+                
             }    
-            yield return new WaitForFixedUpdate();
+            yield return new WaitForSecondsRealtime(1f/64f);
         }
     }
-    void Recieve() //constantly listen
-    {
-        socket.ReceiveTimeout = (1000/128);
-        socket.Blocking = false;
-        //socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
-        byte[] b = new byte[1024];
-        EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
-
-        Task.Run(() =>
-        {
-            while (playing)
-            {
-                if (socket.IsBound)
-                {
-
-                    while (socket.Available > 0)
-                    {
-                        socket.ReceiveFrom(b, ref wanderingGamer);
-                        PacketHandler.instance.OffloadClient(b, (IPEndPoint)wanderingGamer);
-                    }
-
-                }
-            }
-        });
-    }
+   
         
     
       
@@ -229,7 +220,8 @@ public class client : MonoBehaviour
     
     private void FixedUpdate()
     {
-        LinkedListNode<byte[]> buff = instance.Queue.Last;
+       
+        LinkedListNode<byte[]> buff = instance.Queue.Last;//process them fifo
         int count = 0;
         if (buff != null)
         {
@@ -238,21 +230,33 @@ public class client : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             
-            BinaryFormatter b = new BinaryFormatter();
-            MemoryStream m = new MemoryStream(buff.Value);
-            var pack_ = b.Deserialize(m);
-            
-            if (pack_ is Packet)
+            try
             {
-                clientHandlePacket((Packet)pack_);
+                BinaryFormatter b = new BinaryFormatter();
+                MemoryStream m = new MemoryStream(buff.Value);
+                var pack_ = b.Deserialize(m);
+                if (pack_ is Packet)
+                {
+                    clientHandlePacket((Packet)pack_);
+                }
+                else if (pack_ is ServerFragment)
+                {
+
+                    clientHandlePacket((ServerFragment)pack_);
+                }
             }
-            else if(pack_ is ServerFragment)
+            catch (Exception)
             {
+
                 
-                clientHandlePacket((ServerFragment)pack_);
             }
+            
+            
+           
             //integrate the buffer and endpoint down the queue
             buff = buff.Previous;
+            instance.Queue.Last.Value = null;
+
             instance.Queue.RemoveLast();
         }
         if (Input.GetMouseButtonDown(0)&&client.cam != null) 

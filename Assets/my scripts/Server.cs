@@ -1,3 +1,4 @@
+using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +14,7 @@ public class Server : MonoBehaviour
     public Socket socket;
     public GameObject EnemyPrefab;//set in scene
     public List<Player> Players = new List<Player>();
-    public LinkedList<IPEndPoint> EndPoints = new LinkedList<IPEndPoint>();
+    public LinkedList<CSteamID> SteamIDs = new LinkedList<CSteamID>();
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
     public LinkedList<HitAck> Unresolved = new LinkedList<HitAck>();
@@ -28,8 +29,7 @@ public class Server : MonoBehaviour
         else
         {
             instance = this;
-            recieving = true;
-            Recieve();    
+            recieving = true;   
         }
         
     }
@@ -65,15 +65,16 @@ public class Server : MonoBehaviour
         }
         h = new HitAck(H, hit);
     }
-    public void ServerHandlePacket(Packet p, LinkedListNode<IPEndPoint> ep)
+    public void ServerHandlePacket(Packet p, LinkedListNode<CSteamID> ep)
     {
         if (p is ConnectionPacket)
         {//connect our gamer
+            print("server got connection packet");
             bool connected = false;
             ConnectionPacket connPacket = (ConnectionPacket)p;
             for (int y = 0; y < Server.instance.Players.Count; y++)
             {
-                if (Server.instance.Players[y].EndPoint.Port == (ep.Value).Port && Server.instance.Players[y].EndPoint.Address.ToString() == (ep.Value).Address.ToString())
+                if (Server.instance.Players[y].SteamID == (ep.Value))
                 {
                     Server.instance.Players[y].Delay = 2f * (float)(DateTime.Now - p.timeCreated).TotalMilliseconds;//set delay
                     connPacket.playernum = (short)y;
@@ -89,7 +90,8 @@ public class Server : MonoBehaviour
             {
                 connPacket.usernames[i] = Server.instance.Players[i].userName;
             }
-            Task.Run(() => { Server.instance.socket.SendTo((connPacket).toBytes(), ep.Value); });//send back connection packet
+            SteamNetworking.SendP2PPacket(ep.Value, PacketHandler.toClient(connPacket.toBytes()), (uint)PacketHandler.toClient(connPacket.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+            
         }
         else if (p.playernum != 1000)
         {
@@ -99,7 +101,7 @@ public class Server : MonoBehaviour
                 {
                     LinkedListNode<Packet> current;
                     PacketHandler.placeInOrder(Server.instance.Players[p.playernum].PacketHistory, p, out current);//put it in the queue where we read from to determine position
-                    Server.instance.Players[p.playernum].EndPoint = ep.Value;//update the reference to the endpoint
+                    Server.instance.Players[p.playernum].SteamID = ep.Value;//update the reference to the endpoint
 
                 }
                 else if (p is HitAck)
@@ -197,33 +199,13 @@ public class Server : MonoBehaviour
         }
         return Confirms;
     }
-    void Recieve() //constantly listen
+    
+    public void FixedUpdate()
     {
-        socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-       
-        socket.ReceiveTimeout = (1000);
-        socket.Blocking = false;
-        Task.Run(() =>
-        {
-            socket.Bind(new IPEndPoint(new IPAddress(new byte[] { 0, 0, 0, 0 }), 7777));//listen on any address on this port
-            byte[] b = new byte[1024];
-            EndPoint wanderingGamer = new IPEndPoint(IPAddress.Any, 0);
-            while (recieving)
-            {
-                while (socket.Available > 0)
-                {
-                    socket.ReceiveFrom(b, ref wanderingGamer);
-                    PacketHandler.instance.OffloadServer(b, (IPEndPoint)wanderingGamer);
-                }
-            }
-        });
-
-    }
-    public virtual void FixedUpdate()
-    {
+        
         //every frame we start by clearing the buffer of all of its packets
         LinkedListNode<byte[]> buff = instance.Queue.Last;
-        LinkedListNode<IPEndPoint> ep = instance.EndPoints.Last;
+        LinkedListNode<CSteamID> ep = instance.SteamIDs.Last;
         int count = 0;
         if(buff != null) 
         { 
@@ -231,10 +213,13 @@ public class Server : MonoBehaviour
         }
         for (int i = 0; i < count-1; i++)
         {
+           
+            try
+            {
                 BinaryFormatter b = new BinaryFormatter();
                 MemoryStream m = new MemoryStream(buff.Value);
                 var pack_ = b.Deserialize(m);
-                if (pack_ is Packet) 
+                if (pack_ is Packet)
                 {
                     ServerHandlePacket((Packet)pack_, ep);
                 }
@@ -242,7 +227,13 @@ public class Server : MonoBehaviour
                 buff = buff.Previous;
                 ep = ep.Previous;
                 instance.Queue.RemoveLast();
-                instance.EndPoints.RemoveLast();
+                instance.SteamIDs.RemoveLast();
+            }
+            catch (Exception)
+            {
+
+            }
+               
         }
         Player[] p = Players.ToArray();
         LinkedListNode<HitAck> current = Resolved.Last;
@@ -271,21 +262,16 @@ public class Server : MonoBehaviour
                             
                         }
                     //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
-                    Task.Run(() =>
-                    {
-                        socket.SendTo(player.toBytes(), Players[y].EndPoint);
-                    });
+                    print("Server sending position");
+                    SteamNetworking.SendP2PPacket(Players[y].SteamID, PacketHandler.toClient(player.toBytes()), (uint)PacketHandler.toClient(player.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
                 }
                 }
 
 
                 for (int i = 0; i < count; i++)
                 {
-
-                Task.Run(() =>
-                {
-                    instance.socket.SendTo(current.Value.toBytes(), Players[current.Value.playernum].EndPoint);//send resolved packet until we get acknowledgement
-                });
+                SteamNetworking.SendP2PPacket(Players[current.Value.playernum].SteamID, PacketHandler.toClient(current.Value.toBytes()), (uint)PacketHandler.toClient(current.Value.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                
 
                 current = current.Previous;
                 }

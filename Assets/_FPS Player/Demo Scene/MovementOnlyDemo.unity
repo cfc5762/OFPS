@@ -2281,6 +2281,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 497580416}
+  - component: {fileID: 497580418}
+  - component: {fileID: 497580417}
+  - component: {fileID: 497580419}
   m_Layer: 0
   m_Name: _MUST HAVE IN SCENE TO WORK
   m_TagString: Untagged
@@ -2304,6 +2307,44 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &497580417
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 497580415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8bc0894e5b40024a9354938a9d9ed41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  EnemyPrefab: {fileID: 194293473501753797, guid: ebd4dd8a02e88bf4591874b928aa2d20,
+    type: 3}
+--- !u!114 &497580418
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 497580415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7f096f2abab9ea45839fa60dc16359c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &497580419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 497580415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e51e2716b06e1d4d9058086b5011053, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &536179847
 GameObject:
   m_ObjectHideFlags: 0
@@ -5171,6 +5212,34 @@ Transform:
   m_Father: {fileID: 1472340290}
   m_RootOrder: 30
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1069406005 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7085721664118310506, guid: c2dc14f109b09a743b03757ef68006c7,
+    type: 3}
+  m_PrefabInstance: {fileID: 1315965979}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1069406006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1069406005}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4113648cc13e1dc4ebf0db7f33dcdbdd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playing: 0
+  FpsController: {fileID: 1069406005}
+  EnemyPrefab: {fileID: 194293473501753797, guid: ebd4dd8a02e88bf4591874b928aa2d20,
+    type: 3}
+  lastConnectionPacket:
+    ticks: 0
+    playernum: 0
+    disposed: 0
+    usernames: []
+    username: 
 --- !u!1 &1083474173
 GameObject:
   m_ObjectHideFlags: 0
