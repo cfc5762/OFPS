@@ -71,6 +71,7 @@ public class client : MonoBehaviour
     void Awake()
     {
         lastConnectionPacket = new ConnectionPacket();
+        if(!SteamManager.Initialized)
         SteamAPI.Init();
         if (SteamManager.Initialized)
         {
@@ -209,7 +210,7 @@ public class client : MonoBehaviour
                 
                 
             }    
-            yield return new WaitForSecondsRealtime(1f/64f);
+            yield return new WaitForSecondsRealtime(1f/128f);
         }
     }
    

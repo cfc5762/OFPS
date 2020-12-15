@@ -69,7 +69,7 @@ public class Server : MonoBehaviour
     {
         if (p is ConnectionPacket)
         {//connect our gamer
-            print("server got connection packet");
+            
             bool connected = false;
             ConnectionPacket connPacket = (ConnectionPacket)p;
             for (int y = 0; y < Server.instance.Players.Count; y++)
@@ -262,7 +262,7 @@ public class Server : MonoBehaviour
                             
                         }
                     //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
-                    print("Server sending position");
+
                     SteamNetworking.SendP2PPacket(Players[y].SteamID, PacketHandler.toClient(player.toBytes()), (uint)PacketHandler.toClient(player.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
                 }
                 }

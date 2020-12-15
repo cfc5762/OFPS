@@ -5,7 +5,7 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/ClientTestScene.unity
     guid: 09f47eb7068699d41bd18695ef8a3999
   - enabled: 0
@@ -20,4 +20,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/ServerTestScene.unity
     guid: 41a49db00f52dfc429b30b78303fa8ee
+  - enabled: 1
+    path: Assets/MovementServerTestMerge.unity
+    guid: 87cfb805d2ddf434080ef755a4dbee63
   m_configObjects: {}
