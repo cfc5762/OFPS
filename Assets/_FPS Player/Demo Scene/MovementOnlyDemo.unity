@@ -2281,9 +2281,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 497580416}
-  - component: {fileID: 497580418}
   - component: {fileID: 497580417}
+  - component: {fileID: 497580418}
   - component: {fileID: 497580419}
+  - component: {fileID: 497580420}
   m_Layer: 0
   m_Name: _MUST HAVE IN SCENE TO WORK
   m_TagString: Untagged
@@ -2316,11 +2317,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 497580415}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f8bc0894e5b40024a9354938a9d9ed41, type: 3}
+  m_Script: {fileID: 11500000, guid: ef4bffeda13d7a748973ff9204401c07, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  EnemyPrefab: {fileID: 194293473501753797, guid: ebd4dd8a02e88bf4591874b928aa2d20,
-    type: 3}
 --- !u!114 &497580418
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2343,6 +2342,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8e51e2716b06e1d4d9058086b5011053, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &497580420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 497580415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1759faff20029ad49bbb40d5f93a2e5a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!1 &536179847

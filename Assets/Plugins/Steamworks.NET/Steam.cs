@@ -16,11 +16,11 @@ using IntPtr = System.IntPtr;
 
 namespace Steamworks {
 	public static class Version {
-		public const string SteamworksNETVersion = "14.0.0";
-		public const string SteamworksSDKVersion = "1.48";
-		public const string SteamAPIDLLVersion = "05.69.73.98";
-		public const int SteamAPIDLLSize = 237856;
-		public const int SteamAPI64DLLSize = 262944;
+		public const string SteamworksNETVersion = "13.0.0";
+		public const string SteamworksSDKVersion = "1.46";
+		public const string SteamAPIDLLVersion = "05.25.65.21";
+		public const int SteamAPIDLLSize = 259360;
+		public const int SteamAPI64DLLSize = 289568;
 	}
 
 	public static class SteamAPI {
@@ -30,7 +30,6 @@ namespace Steamworks {
 		//	These functions manage loading, initializing and shutdown of the steamclient.dll
 		//
 		//----------------------------------------------------------------------------------------------------------------------------------------------------------//
-
 
 		// SteamAPI_Init must be called before using any other API functions. If it fails, an
 		// error message will be output to the debugger (or stderr) with further information.
@@ -50,11 +49,9 @@ namespace Steamworks {
 			return ret;
 		}
 
-		// SteamAPI_Shutdown should be called during process shutdown if possible.
 		public static void Shutdown() {
 			InteropHelp.TestIfPlatformSupported();
 			NativeMethods.SteamAPI_Shutdown();
-			CSteamAPIContext.Clear();
 		}
 
 		// SteamAPI_RestartAppIfNecessary ensures that your executable was launched through Steam.
@@ -81,6 +78,7 @@ namespace Steamworks {
 			NativeMethods.SteamAPI_ReleaseCurrentThreadMemory();
 		}
 
+
 		//----------------------------------------------------------------------------------------------------------------------------------------------------------//
 		//	steam callback and call-result helpers
 		//
@@ -101,14 +99,9 @@ namespace Steamworks {
 		//
 		//	Callbacks and call-results are queued automatically and are only
 		//	delivered/executed when your application calls SteamAPI_RunCallbacks().
-		//
-		//	Note that there is an alternative, lower level callback dispatch mechanism.
-		//	See SteamAPI_ManualDispatch_Init
 		//----------------------------------------------------------------------------------------------------------------------------------------------------------//
 
-		// Dispatch all queued Steamworks callbacks.
-		//
-		// This is safe to call from multiple threads simultaneously,
+		// SteamAPI_RunCallbacks is safe to call from multiple threads simultaneously,
 		// but if you choose to do this, callback code could be executed on any thread.
 		// One alternative is to call SteamAPI_RunCallbacks from the main thread only,
 		// and call SteamAPI_ReleaseCurrentThreadMemory regularly on other threads.
@@ -127,6 +120,12 @@ namespace Steamworks {
 		public static bool IsSteamRunning() {
 			InteropHelp.TestIfPlatformSupported();
 			return NativeMethods.SteamAPI_IsSteamRunning();
+		}
+
+		// returns the HSteamUser of the last user to dispatch a callback
+		public static HSteamUser GetHSteamUserCurrent() {
+			InteropHelp.TestIfPlatformSupported();
+			return (HSteamUser)NativeMethods.Steam_GetHSteamUserCurrent();
 		}
 
 		// returns the pipe we are communicating to Steam with
@@ -293,8 +292,6 @@ namespace Steamworks {
 			m_pSteamInput = IntPtr.Zero;
 			m_pSteamParties = IntPtr.Zero;
 			m_pSteamRemotePlay = IntPtr.Zero;
-			m_pSteamNetworkingUtils = IntPtr.Zero;
-			m_pSteamNetworkingSockets = IntPtr.Zero;
 		}
 
 		internal static bool Init() {
@@ -377,26 +374,10 @@ namespace Steamworks {
 			m_pSteamParties = SteamClient.GetISteamParties(hSteamUser, hSteamPipe, Constants.STEAMPARTIES_INTERFACE_VERSION);
 			if (m_pSteamParties == IntPtr.Zero) { return false; }
 
-			m_pSteamRemotePlay = SteamClient.GetISteamRemotePlay(hSteamUser, hSteamPipe, Constants.STEAMREMOTEPLAY_INTERFACE_VERSION);
-			if (m_pSteamRemotePlay == IntPtr.Zero) { return false; }
+            m_pSteamRemotePlay = SteamClient.GetISteamRemotePlay(hSteamUser, hSteamPipe, Constants.STEAMREMOTEPLAY_INTERFACE_VERSION);
+            if (m_pSteamRemotePlay == IntPtr.Zero) { return false; }
 
-			using (var pchVersionString = new InteropHelp.UTF8StringHandle(Constants.STEAMNETWORKINGUTILS_INTERFACE_VERSION))
-			{
-				m_pSteamNetworkingUtils =
-					NativeMethods.SteamInternal_FindOrCreateUserInterface(hSteamUser, pchVersionString) != IntPtr.Zero ?
-					NativeMethods.SteamInternal_FindOrCreateUserInterface(hSteamUser, pchVersionString) :
-					NativeMethods.SteamInternal_FindOrCreateGameServerInterface(hSteamUser, pchVersionString);
-			}
-			if (m_pSteamNetworkingUtils == IntPtr.Zero) { return false; }
-
-			using (var pchVersionString = new InteropHelp.UTF8StringHandle(Constants.STEAMNETWORKINGSOCKETS_INTERFACE_VERSION))
-			{
-				m_pSteamNetworkingSockets =
-					NativeMethods.SteamInternal_FindOrCreateUserInterface(hSteamUser, pchVersionString);
-			}
-			if (m_pSteamNetworkingSockets == IntPtr.Zero) { return false; }
-
-			return true;
+            return true;
 		}
 
 		internal static IntPtr GetSteamClient() { return m_pSteamClient; }
@@ -424,8 +405,6 @@ namespace Steamworks {
 		internal static IntPtr GetSteamInput() { return m_pSteamInput; }
 		internal static IntPtr GetSteamParties() { return m_pSteamParties; }
 		internal static IntPtr GetSteamRemotePlay() { return m_pSteamRemotePlay; }
-		internal static IntPtr GetSteamNetworkingUtils() { return m_pSteamNetworkingUtils; }
-		internal static IntPtr GetSteamNetworkingSockets() { return m_pSteamNetworkingSockets; }
 
 		private static IntPtr m_pSteamClient;
 		private static IntPtr m_pSteamUser;
@@ -452,8 +431,6 @@ namespace Steamworks {
 		private static IntPtr m_pSteamInput;
 		private static IntPtr m_pSteamParties;
 		private static IntPtr m_pSteamRemotePlay;
-		private static IntPtr m_pSteamNetworkingUtils;
-		private static IntPtr m_pSteamNetworkingSockets;
 	}
 
 	internal static class CSteamGameServerAPIContext {
@@ -467,9 +444,7 @@ namespace Steamworks {
 			m_pSteamInventory = IntPtr.Zero;
 			m_pSteamUGC = IntPtr.Zero;
 			m_pSteamApps = IntPtr.Zero;
-			m_pSteamNetworkingUtils = IntPtr.Zero;
-			m_pSteamNetworkingSockets = IntPtr.Zero;
-	}
+		}
 
 		internal static bool Init() {
 			HSteamUser hSteamUser = GameServer.GetHSteamUser();
@@ -505,22 +480,6 @@ namespace Steamworks {
 			m_pSteamApps = SteamGameServerClient.GetISteamApps(hSteamUser, hSteamPipe, Constants.STEAMAPPS_INTERFACE_VERSION);
 			if (m_pSteamApps == IntPtr.Zero) { return false; }
 
-			using (var pchVersionString = new InteropHelp.UTF8StringHandle(Constants.STEAMNETWORKINGUTILS_INTERFACE_VERSION))
-			{
-				m_pSteamNetworkingUtils =
-					NativeMethods.SteamInternal_FindOrCreateUserInterface(hSteamUser, pchVersionString) != IntPtr.Zero ?
-					NativeMethods.SteamInternal_FindOrCreateUserInterface(hSteamUser, pchVersionString) :
-					NativeMethods.SteamInternal_FindOrCreateGameServerInterface(hSteamUser, pchVersionString);
-			}
-			if (m_pSteamNetworkingUtils == IntPtr.Zero) { return false; }
-
-			using (var pchVersionString = new InteropHelp.UTF8StringHandle(Constants.STEAMNETWORKINGSOCKETS_INTERFACE_VERSION))
-			{
-				m_pSteamNetworkingSockets =
-					NativeMethods.SteamInternal_FindOrCreateGameServerInterface(hSteamUser, pchVersionString);
-			}
-			if (m_pSteamNetworkingSockets == IntPtr.Zero) { return false; }
-
 			return true;
 		}
 
@@ -533,8 +492,6 @@ namespace Steamworks {
 		internal static IntPtr GetSteamInventory() { return m_pSteamInventory; }
 		internal static IntPtr GetSteamUGC() { return m_pSteamUGC; }
 		internal static IntPtr GetSteamApps() { return m_pSteamApps; }
-		internal static IntPtr GetSteamNetworkingUtils() { return m_pSteamNetworkingUtils; }
-		internal static IntPtr GetSteamNetworkingSockets() { return m_pSteamNetworkingSockets; }
 
 		private static IntPtr m_pSteamClient;
 		private static IntPtr m_pSteamGameServer;
@@ -545,8 +502,6 @@ namespace Steamworks {
 		private static IntPtr m_pSteamInventory;
 		private static IntPtr m_pSteamUGC;
 		private static IntPtr m_pSteamApps;
-		private static IntPtr m_pSteamNetworkingUtils;
-		private static IntPtr m_pSteamNetworkingSockets;
 	}
 }
 

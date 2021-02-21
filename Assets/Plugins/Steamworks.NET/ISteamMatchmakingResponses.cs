@@ -73,7 +73,7 @@ namespace Steamworks {
 				m_pGCHandle.Free();
 			}
 		}
-
+		
 #if NOTHISPTR
 		[UnmanagedFunctionPointer(CallingConvention.StdCall)]
 		private delegate void InternalServerResponded(HServerListRequest hRequest, int iServer);
@@ -82,34 +82,13 @@ namespace Steamworks {
 		[UnmanagedFunctionPointer(CallingConvention.StdCall)]
 		private delegate void InternalRefreshComplete(HServerListRequest hRequest, EMatchMakingServerResponse response);
 		private void InternalOnServerResponded(HServerListRequest hRequest, int iServer) {
-			try
-			{
-				m_ServerResponded(hRequest, iServer);
-			}
-			catch (Exception e)
-			{
-				CallbackDispatcher.ExceptionHandler(e);
-			}
+			m_ServerResponded(hRequest, iServer);
 		}
 		private void InternalOnServerFailedToRespond(HServerListRequest hRequest, int iServer) {
-			try
-			{
-				m_ServerFailedToRespond(hRequest, iServer);
-			}
-			catch (Exception e)
-			{
-				CallbackDispatcher.ExceptionHandler(e);
-			}
+			m_ServerFailedToRespond(hRequest, iServer);
 		}
 		private void InternalOnRefreshComplete(HServerListRequest hRequest, EMatchMakingServerResponse response) {
-			try
-			{
-				m_RefreshComplete(hRequest, response);
-			}
-			catch (Exception e)
-			{
-				CallbackDispatcher.ExceptionHandler(e);
-			}
+			m_RefreshComplete(hRequest, response);
 		}
 #else
 		[UnmanagedFunctionPointer(CallingConvention.ThisCall)]
@@ -119,34 +98,13 @@ namespace Steamworks {
 		[UnmanagedFunctionPointer(CallingConvention.ThisCall)]
 		private delegate void InternalRefreshComplete(IntPtr thisptr, HServerListRequest hRequest, EMatchMakingServerResponse response);
 		private void InternalOnServerResponded(IntPtr thisptr, HServerListRequest hRequest, int iServer) {
-			try
-			{
-				m_ServerResponded(hRequest, iServer);
-			}
-			catch (Exception e)
-			{
-				CallbackDispatcher.ExceptionHandler(e);
-			}
+			m_ServerResponded(hRequest, iServer);
 		}
 		private void InternalOnServerFailedToRespond(IntPtr thisptr, HServerListRequest hRequest, int iServer) {
-			try
-			{
-				m_ServerFailedToRespond(hRequest, iServer);
-			}
-			catch (Exception e)
-			{
-				CallbackDispatcher.ExceptionHandler(e);
-			}
+			m_ServerFailedToRespond(hRequest, iServer);
 		}
 		private void InternalOnRefreshComplete(IntPtr thisptr, HServerListRequest hRequest, EMatchMakingServerResponse response) {
-			try
-			{
-				m_RefreshComplete(hRequest, response);
-			}
-			catch (Exception e)
-			{
-				CallbackDispatcher.ExceptionHandler(e);
-			}
+			m_RefreshComplete(hRequest, response);
 		}
 #endif
 

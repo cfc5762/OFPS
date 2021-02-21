@@ -10,6 +10,7 @@ using UnityEngine;
 //use push front for player packets to order for positional netcode
 public class Server : MonoBehaviour
 {
+    
     static bool recieving = false;
     public Socket socket;
     public GameObject EnemyPrefab;//set in scene
@@ -19,6 +20,17 @@ public class Server : MonoBehaviour
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
     public LinkedList<HitAck> Unresolved = new LinkedList<HitAck>();
     public static Server instance;
+    protected Callback<LobbyCreated_t> OnLobbyCreated = Callback<LobbyCreated_t>.Create(onLobbyCreated);
+    protected void onLobbyCreated(LobbyCreated_t result) 
+    {
+        for in)
+        {
+
+        }
+        if (result.m_eResult != EResult.k_EResultOK) {
+            return;
+        }
+    }
     // Start is called before the first frame update
     void Awake()//set the server singleton
     {
@@ -31,6 +43,7 @@ public class Server : MonoBehaviour
             instance = this;
             recieving = true;   
         }
+        SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly,);
         
     }
     private void OnDestroy()
@@ -69,7 +82,7 @@ public class Server : MonoBehaviour
     {
         if (p is ConnectionPacket)
         {//connect our gamer
-            
+            Debug.Log("heard from " + ep.Value);
             bool connected = false;
             ConnectionPacket connPacket = (ConnectionPacket)p;
             for (int y = 0; y < Server.instance.Players.Count; y++)
@@ -255,15 +268,13 @@ public class Server : MonoBehaviour
                     player.timeCreated = lastMVPK.Value.timeCreated;
                     for (int y = 0; y < Players.Count; y++)
                     {//send to each player
-                        if (y == player.playernum) 
+                        if (y != player.playernum) 
                         {
-                            player.position = new Vector3(player.position.x * -1,player.position.y,player.position.z * -1);
-                            player.playernum = (short)(player.playernum + 1);
-                            
-                        }
+                        SteamNetworking.SendP2PPacket(Players[y].SteamID, PacketHandler.toClient(player.toBytes()), (uint)PacketHandler.toClient(player.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                    }
                     //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
 
-                    SteamNetworking.SendP2PPacket(Players[y].SteamID, PacketHandler.toClient(player.toBytes()), (uint)PacketHandler.toClient(player.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                   
                 }
                 }
 

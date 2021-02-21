@@ -75,13 +75,22 @@ public class client : MonoBehaviour
         SteamAPI.Init();
         if (SteamManager.Initialized)
         {
+            SteamNetworking.AllowP2PPacketRelay(true);
             string name = SteamFriends.GetPersonaName();
             username = name;
             Debug.Log(name);
         }
         
         server = SteamUser.GetSteamID();
-        
+        if (File.Exists("host.txt"))
+        {
+            StreamReader reader = new StreamReader("host.txt");
+            server = new CSteamID(ulong.Parse(reader.ReadLine()));
+        }
+        else {
+            PacketHandler.instance.gameObject.AddComponent<Server>();
+            PacketHandler.instance.gameObject.GetComponent<Server>().EnemyPrefab = EnemyPrefab;
+        }
         if (instance != null && instance != this)
         {
             gameObject.SetActive(false);
@@ -109,6 +118,7 @@ public class client : MonoBehaviour
     }
     public void clientHandlePacket(Packet p)
     {
+        Debug.Log("got packet");
         if (p is MovementPacket)
         {
 
@@ -116,12 +126,20 @@ public class client : MonoBehaviour
         //if its a connection packet log the interaction
         else if (p is ConnectionPacket)
         {
-            print("client got connection packet");
+            
             using (ConnectionPacket P = (ConnectionPacket)p)
             {
                 if (p.playernum != myPlayerNum && Players.Count == p.playernum)
                 {
                     PacketHandler.makeNewPlayerClient(P);
+                }
+                else if (p.playernum == myPlayerNum)
+                {
+                    Debug.Log("client got connection packet from self");
+                }
+                else 
+                {
+                    Debug.Log("client got connection packet from " + p.playernum + " my num " + myPlayerNum);
                 }
                 lastConnectionPacket = P;
                 myPlayerNum = P.playernum;
@@ -172,18 +190,16 @@ public class client : MonoBehaviour
     {
         while (playing) 
         {
-            if (lastConnectionPacket != new ConnectionPacket())
+            Debug.Log("sending to " + server);
+            if (!SteamNetworking.SendP2PPacket(server, PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()), (uint)PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay)) 
             {
-                
-                SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()), (uint)PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                Debug.Log("bad");
             }
-            else 
+            if (lastConnectionPacket == null) 
             {
-                CSteamID myId = SteamUser.GetSteamID();
-                
-                SteamNetworking.SendP2PPacket(myId, PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()), (uint)PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
-
+                SteamNetworking.AcceptP2PSessionWithUser(server);
             }
+            
             yield return new WaitForSecondsRealtime(1);
         }    
     }
@@ -221,6 +237,7 @@ public class client : MonoBehaviour
     
     private void FixedUpdate()
     {
+        
        
         LinkedListNode<byte[]> buff = instance.Queue.Last;//process them fifo
         int count = 0;
@@ -295,8 +312,9 @@ public class client : MonoBehaviour
                     Vector3 j = (((MovementPacket)player.PacketHistory.First.Next.Value).position - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).position);
                     Vector3 PredictionPoint = (i - 2 * n * Vector3.Dot(i, n));
                     //float avgSpeed = (n_nocross.magnitude + j.magnitude) / (float)(((MovementPacket)player.PacketHistory.First.Value).timeCreated - ((MovementPacket)player.PacketHistory.First.Next.Next.Value).timeCreated).TotalSeconds;//place the enemy players with magic
-                    float speed = n_nocross.sqrMagnitude / j.magnitude;
-                    
+                    float speed = i.magnitude/ (float)((player.PacketHistory.First.Value.timeCreated- player.PacketHistory.First.Next.Next.Value.timeCreated).TotalMilliseconds/1000.0);
+
+
                     float timeCoeff = (float)((DateTime.Now - player.PacketHistory.First.Value.timeCreated).TotalMilliseconds / (player.PacketHistory.First.Next.Value.timeCreated - player.PacketHistory.First.Next.Next.Value.timeCreated).TotalMilliseconds);
                     //print(((float)(DateTime.Now).Millisecond) - (player.PacketHistory.First.Value.timeCreated.Millisecond) + " " + ((player.PacketHistory.First.Value.timeCreated.Millisecond) - (player.PacketHistory.First.Next.Next.Value.timeCreated.Millisecond)));
                     
@@ -309,7 +327,7 @@ public class client : MonoBehaviour
                     Debug.DrawLine(((MovementPacket)player.PacketHistory.First.Value).position, ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint));
                     Vector3 playerposition;
                     if (speed<PredictionPoint.magnitude*1.2f)
-                        playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + ((PredictionPoint.normalized*speed)+(timeCoeff * PredictionPoint))*.5f;
+                        playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint.normalized*speed);
                     else
                         playerposition = ((MovementPacket)player.PacketHistory.First.Value).position + (PredictionPoint * timeCoeff);
 
