@@ -10,10 +10,11 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SocialPlatforms;
 using Steamworks;
+using System.Linq;
 
 public class client : MonoBehaviour
 {
-    
+    bool connected;
     public static int myPlayerNum;
     public LinkedList<HitPacket> unConfirmed;
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
@@ -24,10 +25,11 @@ public class client : MonoBehaviour
     public ConnectionPacket lastConnectionPacket;//all statics except for instance are to be set outside the script
     public static client instance;
     public IPEndPoint localEp;
-    public static CSteamID server;//needs to be set outside of this script before scene load
+    public static SteamId server;//needs to be set outside of this script before scene load
     public static string username;//needs to be set outside of this script before scene load
     public Socket socket;
     public List<Player> Players = new List<Player>();
+    bool lastconnvalue;
     public static byte commandToByte(string command) 
     {
         switch (command)
@@ -70,26 +72,29 @@ public class client : MonoBehaviour
     // Start is called before the first frame update
     void Awake()
     {
+        SteamNetworkingUtils.SendBufferSize = 512;
+        SteamNetworkingUtils.InitRelayNetworkAccess();
         lastConnectionPacket = new ConnectionPacket();
-        if(!SteamManager.Initialized)
-        SteamAPI.Init();
-        if (SteamManager.Initialized)
-        {
+       
+       
             SteamNetworking.AllowP2PPacketRelay(true);
-            string name = SteamFriends.GetPersonaName();
-            username = name;
-            Debug.Log(name);
-        }
+            
+           
+            username = SteamManager.Instance.PlayerName;
+            Debug.Log(username);
+       
         
-        server = SteamUser.GetSteamID();
+        server = SteamClient.SteamId;
         if (File.Exists("host.txt"))
         {
             StreamReader reader = new StreamReader("host.txt");
-            server = new CSteamID(ulong.Parse(reader.ReadLine()));
+           
+            SteamMatchmaking.JoinLobbyAsync(ulong.Parse(reader.ReadLine()));
         }
         else {
             PacketHandler.instance.gameObject.AddComponent<Server>();
             PacketHandler.instance.gameObject.GetComponent<Server>().EnemyPrefab = EnemyPrefab;
+            PacketHandler.instance.gameObject.GetComponent<Server>().init();
         }
         if (instance != null && instance != this)
         {
@@ -118,7 +123,7 @@ public class client : MonoBehaviour
     }
     public void clientHandlePacket(Packet p)
     {
-        Debug.Log("got packet");
+        
         if (p is MovementPacket)
         {
 
@@ -132,10 +137,11 @@ public class client : MonoBehaviour
                 if (p.playernum != myPlayerNum && Players.Count == p.playernum)
                 {
                     PacketHandler.makeNewPlayerClient(P);
+                    Debug.Log("client got connection packet from " + p.playernum + " my num " + myPlayerNum);
                 }
                 else if (p.playernum == myPlayerNum)
                 {
-                    Debug.Log("client got connection packet from self");
+                    //Debug.Log("client got connection packet from self");
                 }
                 else 
                 {
@@ -166,7 +172,7 @@ public class client : MonoBehaviour
                     unconfirmed = unconfirmed.Next;
                 }
             }
-            SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(P.toBytes()), (uint)PacketHandler.toServer(P.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+            SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(P.toBytes()), (int)PacketHandler.toServer(P.toBytes()).Length, 0,P2PSend.UnreliableNoDelay);
             
         }
     }
@@ -190,15 +196,21 @@ public class client : MonoBehaviour
     {
         while (playing) 
         {
-            Debug.Log("sending to " + server);
-            if (!SteamNetworking.SendP2PPacket(server, PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()), (uint)PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay)) 
+            //Debug.Log(server);
+            //Debug.Log(username);
+            //Debug.Log(myPlayerNum);
+            
+            try
             {
-                Debug.Log("bad");
+                SteamNetworking.SendP2PPacket(server, PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()), (int)PacketHandler.toServer((new ConnectionPacket(username, lastConnectionPacket.playernum)).toBytes()).Length, 0, P2PSend.UnreliableNoDelay);
             }
-            if (lastConnectionPacket == null) 
+            catch (Exception E)
             {
-                SteamNetworking.AcceptP2PSessionWithUser(server);
+
+                Debug.Log(E.Message);
             }
+            
+            
             
             yield return new WaitForSecondsRealtime(1);
         }    
@@ -209,20 +221,20 @@ public class client : MonoBehaviour
         {
             if (lastConnectionPacket != new ConnectionPacket())
             {
-              
+                connected = true;
                     MovementPacket movement = new MovementPacket(FpsController.transform.position, FpsController.transform.rotation, myPlayerNum);//construct a movement packet out of our player
                     LinkedListNode<HitPacket> shot = unConfirmed.Last;
 
                     for (int i = 0; i < unConfirmed.Count; i++)//send all unconfirmed shots
                     {
-                        SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(shot.Value.toBytes()), (uint)PacketHandler.toServer(shot.Value.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                        SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(shot.Value.toBytes()), (int)PacketHandler.toServer(shot.Value.toBytes()).Length, 0, P2PSend.UnreliableNoDelay);
 
 
                         if (shot.Previous == null)
                             break;
                         shot = shot.Previous;
                     }
-                    SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(movement.toBytes()), (uint)PacketHandler.toServer(movement.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                    SteamNetworking.SendP2PPacket(client.server, PacketHandler.toServer(movement.toBytes()), (int)PacketHandler.toServer(movement.toBytes()).Length, 0, P2PSend.UnreliableNoDelay);
                 
                 
             }    
@@ -237,8 +249,11 @@ public class client : MonoBehaviour
     
     private void FixedUpdate()
     {
-        
-       
+        if (!lastconnvalue && connected) 
+        {
+            Debug.Log("connected");
+        }
+        lastconnvalue = connected;
         LinkedListNode<byte[]> buff = instance.Queue.Last;//process them fifo
         int count = 0;
         if (buff != null)

@@ -17,7 +17,7 @@ public class Player
         respawnTimer = 0;
         PacketHistory = new LinkedList<Packet>();
         HealthHistory = new LinkedList<int>();
-        SteamID = new CSteamID();
+        SteamID = 0;
         Dummy = null;
     }
     public string userName;
@@ -26,7 +26,7 @@ public class Player
     public int respawnTimer;
     public LinkedList<int> HealthHistory;
     public LinkedList<Packet> PacketHistory;
-    public CSteamID SteamID;
+    public SteamId SteamID;
     public GameObject Dummy;
     public int damageTaken;
     public float Delay;

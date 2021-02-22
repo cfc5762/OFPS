@@ -1,4 +1,5 @@
 using Steamworks;
+using Steamworks.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,39 +13,38 @@ public class Server : MonoBehaviour
 {
     
     static bool recieving = false;
-    public Socket socket;
+    bool lobby;
     public GameObject EnemyPrefab;//set in scene
     public List<Player> Players = new List<Player>();
-    public LinkedList<CSteamID> SteamIDs = new LinkedList<CSteamID>();
+    public LinkedList<SteamId> SteamIDs = new LinkedList<SteamId>();
     public LinkedList<byte[]> Queue = new LinkedList<byte[]>();
     public LinkedList<HitAck> Resolved = new LinkedList<HitAck>();
     public LinkedList<HitAck> Unresolved = new LinkedList<HitAck>();
     public static Server instance;
-    protected Callback<LobbyCreated_t> OnLobbyCreated = Callback<LobbyCreated_t>.Create(onLobbyCreated);
-    protected void onLobbyCreated(LobbyCreated_t result) 
-    {
-        for in)
-        {
+    bool gameserver = false;
 
-        }
-        if (result.m_eResult != EResult.k_EResultOK) {
-            return;
-        }
-    }
     // Start is called before the first frame update
-    void Awake()//set the server singleton
+    public void init()//set the server singleton
     {
+        Debug.Log("starting server");
         if (instance != null && instance != this)
         {
             gameObject.SetActive(false);
+            return;
         }
         else
         {
             instance = this;
             recieving = true;   
         }
-        SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly,);
-        
+
+        friendlobby();
+
+
+    }
+    async void friendlobby() 
+    {
+        lobby = await SteamManager.Instance.CreateFriendLobby();
     }
     private void OnDestroy()
     {
@@ -78,11 +78,11 @@ public class Server : MonoBehaviour
         }
         h = new HitAck(H, hit);
     }
-    public void ServerHandlePacket(Packet p, LinkedListNode<CSteamID> ep)
+    public void ServerHandlePacket(Packet p, LinkedListNode<SteamId> ep)
     {
         if (p is ConnectionPacket)
         {//connect our gamer
-            Debug.Log("heard from " + ep.Value);
+           
             bool connected = false;
             ConnectionPacket connPacket = (ConnectionPacket)p;
             for (int y = 0; y < Server.instance.Players.Count; y++)
@@ -103,7 +103,7 @@ public class Server : MonoBehaviour
             {
                 connPacket.usernames[i] = Server.instance.Players[i].userName;
             }
-            SteamNetworking.SendP2PPacket(ep.Value, PacketHandler.toClient(connPacket.toBytes()), (uint)PacketHandler.toClient(connPacket.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+            SteamNetworking.SendP2PPacket(ep.Value, PacketHandler.toClient(connPacket.toBytes()), PacketHandler.toClient(connPacket.toBytes()).Length, 0,P2PSend.UnreliableNoDelay);
             
         }
         else if (p.playernum != 1000)
@@ -215,10 +215,28 @@ public class Server : MonoBehaviour
     
     public void FixedUpdate()
     {
-        
+        if (lobby&!gameserver) 
+        {
+            gameserver = true;
+                Debug.Log("Created Friend Lobby " + SteamManager.Instance.currentLobby.Owner.Name + " is the owner with steamID " + SteamManager.Instance.currentLobby.Owner.Id);
+            try
+            {
+                SteamManager.Instance.currentLobby.SetGameServer(SteamClient.SteamId);
+            }
+            catch (Exception ex )
+            {
+                Debug.Log(ex.Message);
+               
+            }    
+            
+            
+            
+         
+            
+        }
         //every frame we start by clearing the buffer of all of its packets
         LinkedListNode<byte[]> buff = instance.Queue.Last;
-        LinkedListNode<CSteamID> ep = instance.SteamIDs.Last;
+        LinkedListNode<SteamId> ep = instance.SteamIDs.Last;
         int count = 0;
         if(buff != null) 
         { 
@@ -270,7 +288,7 @@ public class Server : MonoBehaviour
                     {//send to each player
                         if (y != player.playernum) 
                         {
-                        SteamNetworking.SendP2PPacket(Players[y].SteamID, PacketHandler.toClient(player.toBytes()), (uint)PacketHandler.toClient(player.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                        SteamNetworking.SendP2PPacket(Players[y].SteamID, PacketHandler.toClient(player.toBytes()), (int)PacketHandler.toClient(player.toBytes()).Length, 0,P2PSend.UnreliableNoDelay);
                     }
                     //print("sending player["+player.playernum+"]'s position: "+player.position+" to "+Players[y].EndPoint.Address+" "+Players[y].EndPoint.Port);
 
@@ -281,17 +299,13 @@ public class Server : MonoBehaviour
 
                 for (int i = 0; i < count; i++)
                 {
-                SteamNetworking.SendP2PPacket(Players[current.Value.playernum].SteamID, PacketHandler.toClient(current.Value.toBytes()), (uint)PacketHandler.toClient(current.Value.toBytes()).Length, EP2PSend.k_EP2PSendUnreliableNoDelay);
+                SteamNetworking.SendP2PPacket(Players[current.Value.playernum].SteamID, PacketHandler.toClient(current.Value.toBytes()), (int)PacketHandler.toClient(current.Value.toBytes()).Length, 0,P2PSend.UnreliableNoDelay);
                 
 
                 current = current.Previous;
                 }
             }
         
-        
-    }
-    private void Start()
-    {
         
     }
     

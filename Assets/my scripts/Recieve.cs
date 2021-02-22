@@ -1,51 +1,59 @@
 ﻿using Steamworks;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class Recieve : MonoBehaviour
 {
-    public static Callback<P2PSessionRequest_t> _p2PSessionRequestCallback;
-    public static Callback<P2PSessionConnectFail_t> _p2PSessionRequestFail;
+    public static void OnP2PConnectionFailed(SteamId id, P2PSessionError error)
+        {
+            Debug.Log(id + " " + error.ToString());
+        }
+    static void OnP2PSessionRequest(SteamId id) 
+    {
+        SteamNetworking.AcceptP2PSessionWithUser(id);
+    }
 
     void Start()
     {
         // setup the callback method
-        _p2PSessionRequestCallback = Callback<P2PSessionRequest_t>.Create(OnP2PSessionRequest);
-        _p2PSessionRequestFail = Callback<P2PSessionConnectFail_t>.Create(OnP2PSessionFail);
+        SteamNetworking.OnP2PSessionRequest += OnP2PSessionRequest;
+        SteamNetworking.OnP2PConnectionFailed += OnP2PConnectionFailed;
     }
-    void OnP2PSessionFail(P2PSessionConnectFail_t request)
-    {
-        Debug.Log("got request fail - " + request.m_eP2PSessionError.ToString());
-        CSteamID clientId = request.m_steamIDRemote;
-        SteamNetworking.AcceptP2PSessionWithUser(clientId);
-    }
-    void OnP2PSessionRequest(P2PSessionRequest_t request)
-    {
-        Debug.Log("got request " + request.ToString());
-        CSteamID clientId = request.m_steamIDRemote;
-        SteamNetworking.AcceptP2PSessionWithUser(clientId);
-    }
+    
     void RecieveCall() //constantly listen
     {
 
         uint msgsize = 0;
-        while (SteamNetworking.IsP2PPacketAvailable(out msgsize))
+        while (SteamNetworking.IsP2PPacketAvailable())
         {
-            Debug.Log("got a msg");
-            var b = new byte[msgsize];
-            uint bytesRead;
-            CSteamID wanderingGamer;
-            if (SteamNetworking.ReadP2PPacket(b, msgsize, out bytesRead, out wanderingGamer))
+            var b = new byte[512];
+            SteamId wanderingGamer = 0;
+            if (PacketHandler.instance != null) 
+            { 
+            if (SteamNetworking.ReadP2PPacket(b, ref msgsize, ref wanderingGamer, 0))
             {
-                if (b[0] == 200)
+                
+
+                if (b != null)
                 {
-                    PacketHandler.instance.OffloadClient(PacketHandler.fromClient(b), wanderingGamer);
+                    if (b[0] == 200)
+                    {
+
+                        PacketHandler.instance.OffloadClient(PacketHandler.fromClient(b), wanderingGamer);
+                    }
+                    else if (b[0] == 100)
+                    {
+                            
+                        PacketHandler.instance.OffloadServer(PacketHandler.fromServer(b), wanderingGamer);
+                    }
                 }
-                else if (b[0] == 100)
-                {
-                    PacketHandler.instance.OffloadServer(PacketHandler.fromServer(b), wanderingGamer);
-                }
+            }
+        }
+            else
+            {
+                Debug.Log("Waiting on packethandler");
             }
         }
     }

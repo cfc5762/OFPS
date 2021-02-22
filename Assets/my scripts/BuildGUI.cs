@@ -9,7 +9,7 @@ public class BuildGUI : MonoBehaviour
     
     void OnEnable() { Application.logMessageReceived += Log; }
     void OnDisable() { Application.logMessageReceived -= Log; }
-    void Update() { if (Input.GetKeyDown(KeyCode.Space)) { doShow = !doShow; } }
+    void Update() { if (Input.GetKeyDown("`")) { doShow = !doShow; } }
     public void Log(string logString, string stackTrace, LogType type)
     {
         // for onscreen...

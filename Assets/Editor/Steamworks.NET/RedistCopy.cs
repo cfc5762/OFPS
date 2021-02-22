@@ -65,18 +65,8 @@ public class RedistCopy {
 			return;
 		}
 
-		string[] DebugInfo = {
-			"Steamworks.NET created by Riley Labrecque",
-			"http://steamworks.github.io",
-			"",
-			"Steamworks.NET Version: " + Steamworks.Version.SteamworksNETVersion,
-			"Steamworks SDK Version: " + Steamworks.Version.SteamworksSDKVersion,
-			"Steam API DLL Version:  " + Steamworks.Version.SteamAPIDLLVersion,
-			"Steam API DLL Size:     " + Steamworks.Version.SteamAPIDLLSize,
-			"Steam API64 DLL Size:   " + Steamworks.Version.SteamAPI64DLLSize,
-			""
-		};
-		File.WriteAllLines(Path.Combine(pluginsDir, "Steamworks.NET.txt"), DebugInfo);
+		
+
 
 #if !DISABLEREDISTCOPY
 		if (target == BuildTarget.StandaloneWindows64) {

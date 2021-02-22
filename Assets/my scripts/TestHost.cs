@@ -10,7 +10,7 @@ public class TestHost : MonoBehaviour
     void Start()
     {
         client.username = "silktail";
-        client.server = new Steamworks.CSteamID();//temp initialization
+        client.server = 0;//temp initialization
         
         SceneManager.LoadScene(0);//loadclienttest
        

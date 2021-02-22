@@ -18,8 +18,10 @@ public class PacketHandler : MonoBehaviour
     }
     public static byte[] fromServer(byte[] b)
     {
+        
         List<byte> b2 = b.ToList<byte>();
         b2.RemoveAt(0);
+        
         return b2.ToArray();
     }
     public static byte[] toClient(byte[] b)
@@ -48,7 +50,7 @@ public class PacketHandler : MonoBehaviour
             instance = this;
         }
     }
-    public void OffloadClient(byte[] P, CSteamID e)
+    public void OffloadClient(byte[] P, SteamId e)
     {
         if (P != null && e != null)
         {
@@ -59,10 +61,23 @@ public class PacketHandler : MonoBehaviour
             
         }
     }
-    public void OffloadServer(byte[] P, CSteamID e)
+    public void OffloadServer(byte[] P, SteamId e)
     {
-        Server.instance.SteamIDs.AddFirst(e);
-        Server.instance.Queue.AddFirst(P);
+        
+        if (Server.instance)
+        {
+            
+
+            Server.instance.SteamIDs.AddFirst(e);
+            Server.instance.Queue.AddFirst(P);
+            
+        }
+        else {
+            Debug.Log("server isnt setup");
+            PacketHandler.instance.gameObject.AddComponent<Server>();
+            PacketHandler.instance.gameObject.GetComponent<Server>().EnemyPrefab = client.instance.EnemyPrefab;
+            PacketHandler.instance.gameObject.GetComponent<Server>().init();
+        }
     }
     public static void makeNewPlayerClient(ConnectionPacket P)
     {
@@ -87,7 +102,7 @@ public class PacketHandler : MonoBehaviour
         player.playernum = s.playernum;
         client.instance.Players.Add(player);
     }
-    public static void makeNewPlayerServer(ConnectionPacket P , LinkedListNode<CSteamID> ep) 
+    public static void makeNewPlayerServer(ConnectionPacket P , LinkedListNode<SteamId> ep) 
     {
         Player Gamer = new Player();
         Gamer.Delay = 2f * (float)(DateTime.Now - P.timeCreated).TotalMilliseconds;
